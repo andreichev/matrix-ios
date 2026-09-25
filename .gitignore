@@ -69,3 +69,7 @@ fastlane/report.json
 
 # Other artifacts
 *.orig
+
+# Signing and APNs private keys belong outside the repository
+*.p8
+*.p12
