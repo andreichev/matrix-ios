@@ -1,0 +1,71 @@
+# macOS
+*.DS_Store
+
+# Xcode user-specific settings
+xcuserdata/
+
+# Xcode
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+*.xcscmblueprint
+
+# Derived data folder
+/DerivedData/
+
+# Build products
+/build/
+/*.ipa
+/*.dSYM.zip
+/*.dSYM
+
+# CocoaPods
+Pods/
+Podfile.lock
+Pods/Manifest.lock
+
+# Swift Package Manager
+/.build/
+.swiftpm
+
+# Carthage
+Carthage/Build
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/report.json
+
+# Code coverage
+*.xccoverage
+*.gcda
+
+# AppCode
+.idea/
+
+# Bundler
+/.bundle/
+
+# Sublime Text
+*.sublime-workspace
+
+# Xcode Archive
+*.xcarchive
+
+# Temporary files
+*.tmp
+*.temp
+
+# SwiftLint
+.swiftlint.yml
+
+# Other artifacts
+*.orig
