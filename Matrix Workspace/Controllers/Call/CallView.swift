@@ -153,7 +153,10 @@ final class CallView: UIView, UICollectionViewDataSource {
         speakerButton.accessibilityValue = state.speakerEnabled ? "Включена" : "Выключена"
         participants =
             state.call?.participants.flatMap { person in
-                person.connections.map { connection in
+                if person.connections.isEmpty {
+                    return [ParticipantDisplayModel(name: person.name, muted: true, isCurrent: false, status: person.status)]
+                }
+                return person.connections.map { connection in
                     ParticipantDisplayModel(
                         name: person.name,
                         muted: connection.peerId == state.call?.myPeerId

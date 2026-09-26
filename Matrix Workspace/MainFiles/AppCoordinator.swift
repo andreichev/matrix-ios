@@ -5,6 +5,7 @@ final class AppCoordinator {
     let navigationController = UINavigationController()
     private let services: AppServices
     private var auth: AuthService { services.auth }
+    private weak var workspace: WorkspaceController?
 
     init(services: AppServices) { self.services = services }
 
@@ -12,12 +13,15 @@ final class AppCoordinator {
         services.onInvalidated = { [weak self] in self?.showLogin() }
         services.calls.onOpen = { [weak self] call in self?.showCall(call) }
         if auth.current == nil { showLogin(error: services.restoreError) } else { showCalls() }
+        services.notifications.onOpen = { [weak self] route in self?.workspace?.open(route: route) }
     }
 
-    func suspend() { (navigationController.topViewController as? CallsListController)?.suspend() }
+    func suspend() { workspace?.setActive(false) }
     func resume() {
         services.push.synchronize()
-        (navigationController.topViewController as? CallsListController)?.resume()
+        services.notifications.synchronize()
+        services.notifications.clearDelivered()
+        workspace?.setActive(true)
         (navigationController.topViewController as? CallController)?.refresh()
     }
     func stop() {
@@ -27,6 +31,8 @@ final class AppCoordinator {
 
     private func showLogin(error: String? = nil) {
         stop()
+        workspace = nil
+        navigationController.setNavigationBarHidden(false, animated: false)
         let controller = LoginController(auth: auth)
         controller.onLogin = { [weak self] in self?.showCalls() }
         navigationController.setViewControllers([controller], animated: false)
@@ -34,21 +40,11 @@ final class AppCoordinator {
     }
 
     private func showCalls() {
-        let controller = CallsListController(auth: auth)
-        controller.onSelect = { [weak self] target in
-            self?.services.calls.open(target)
-        }
-        controller.onLogoutError = { [weak self] error in
-            guard let self else { return }
-            if let login = self.navigationController.topViewController as? LoginController {
-                login.showError(error)
-            } else {
-                let alert = UIAlertController(title: "Не удалось выйти", message: error, preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "Закрыть", style: .default))
-                self.navigationController.present(alert, animated: true)
-            }
-        }
+        guard let server = auth.current?.server else { return }
+        let controller = WorkspaceController(auth: auth, calls: services.calls, server: server)
+        workspace = controller
         navigationController.setViewControllers([controller], animated: false)
+        services.notifications.synchronize()
         if let call = services.calls.active { showCall(call) }
     }
 

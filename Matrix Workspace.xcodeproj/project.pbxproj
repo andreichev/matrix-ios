@@ -30,7 +30,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
-				Resources/Matrix.entitlements,
 			);
 			target = 42423CEE3065514C00A5D6A3 /* Matrix Workspace */;
 		};
@@ -214,9 +213,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APNS_ENVIRONMENT = development;
-				CODE_SIGN_ENTITLEMENTS = "Matrix Workspace/Resources/Matrix.entitlements";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Matrix Workspace/Resources/Matrix.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = NXAGVF2MTG;
@@ -247,9 +246,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APNS_ENVIRONMENT = production;
-				CODE_SIGN_ENTITLEMENTS = "Matrix Workspace/Resources/Matrix.entitlements";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Matrix Workspace/Resources/Matrix.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = NXAGVF2MTG;
