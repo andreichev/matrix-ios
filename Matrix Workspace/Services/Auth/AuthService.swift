@@ -50,7 +50,13 @@ final class AuthService {
 
     func restore() throws {
         guard let data = try store.read() else { return }
-        current = try JSONDecoder().decode(AuthSession.self, from: data)
+        let session = try JSONDecoder().decode(AuthSession.self, from: data)
+        // Never reuse credentials from another environment.
+        guard session.server.url.standardized == ServerAddress.configured.url.standardized else {
+            try store.clear()
+            return
+        }
+        current = session
     }
 
     func login(server: ServerAddress, username: String, password: String) async throws {
@@ -88,17 +94,6 @@ final class AuthService {
         refreshTask = task
         defer { if epoch == generation { refreshTask = nil } }
         return try await task.value.accessToken
-    }
-
-    func get<T: Decodable>(_ path: String, as type: T.Type) async throws -> T {
-        guard let server = current?.server else { throw MatrixError.unauthorized }
-        let token = try await accessToken()
-        do {
-            return try JSONDecoder().decode(type, from: await http.send(server: server, path: path, token: token))
-        } catch MatrixError.unauthorized {
-            let fresh = try await accessToken(forceRefresh: true)
-            return try JSONDecoder().decode(type, from: await http.send(server: server, path: path, token: fresh))
-        }
     }
 
     func logout() async throws {

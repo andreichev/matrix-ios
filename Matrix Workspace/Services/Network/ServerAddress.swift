@@ -1,6 +1,14 @@
 import Foundation
 
 struct ServerAddress: Codable, Equatable, Sendable {
+    static let configured: ServerAddress = {
+        #if DEBUG
+            return try! ServerAddress("http://localhost:8080")
+        #else
+            return try! ServerAddress("https://zvezdafabrika.ru")
+        #endif
+    }()
+
     let url: URL
 
     init(_ input: String) throws {

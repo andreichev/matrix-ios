@@ -32,14 +32,14 @@ private final class MockHTTP: URLProtocol, @unchecked Sendable {
 
 @MainActor
 final class AuthTests: XCTestCase {
-    private func setupSession() throws -> (AuthService, KeychainStore) {
+    private func setupSession(server: ServerAddress = .configured) throws -> (AuthService, KeychainStore) {
         MockHTTP.requests = []
         MockHTTP.refreshStatus = 200
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockHTTP.self]
         let store = KeychainStore(service: "matrix.tests.\(UUID())")
         let old = AuthSession(
-            server: try ServerAddress("https://example.org"), username: "tester",
+            server: server, username: "tester",
             tokens: AuthTokens(
                 accessToken: "old", expiresAt: "2000-01-01T00:00:00Z", refreshToken: "original",
                 refreshExpiresAt: "2099-02-01T00:00:00Z"))
@@ -47,6 +47,17 @@ final class AuthTests: XCTestCase {
         let auth = AuthService(http: HTTPClient(configuration: config), store: store)
         try auth.restore()
         return (auth, store)
+    }
+
+    func testRestoreDiscardsSessionFromAnotherServer() throws {
+        let (auth, store) = try setupSession(server: ServerAddress("https://other.example.org"))
+        defer {
+            try? store.clear()
+            auth.http.session.invalidateAndCancel()
+        }
+        XCTAssertNil(auth.current)
+        XCTAssertNil(try store.read())
+        XCTAssertTrue(MockHTTP.requests.isEmpty)
     }
 
     func testConcurrentRefreshUsesOneRequestAndPersistsRotation() async throws {

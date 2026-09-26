@@ -36,13 +36,6 @@ struct CallsSnapshot: Decodable, Sendable {
     let iceServers: JSONValue
 }
 
-struct ChatSummary: Decodable {
-    let id: String
-    let displayTitle: String
-}
-
-struct ChatsResponse: Decodable { let items: [ChatSummary] }
-
 enum CallTarget {
     case chat(String)
     case call(String)

@@ -17,7 +17,7 @@ final class LoginView: UIView {
     }()
     private lazy var heading: UILabel = {
         let view = UILabel()
-        view.text = "Матрица · Звонки"
+        view.text = "Матрица"
         view.font = .preferredFont(forTextStyle: .largeTitle)
         view.adjustsFontForContentSizeCategory = true
         view.numberOfLines = 0
@@ -26,20 +26,11 @@ final class LoginView: UIView {
     }()
     private lazy var descriptionLabel: UILabel = {
         let view = UILabel()
-        view.text = "Нативный тестовый клиент. Войдите в свою учётную запись Матрицы."
+        view.text = "Войдите в свою учётную запись Матрицы."
         view.font = .preferredFont(forTextStyle: .body)
         view.adjustsFontForContentSizeCategory = true
         view.textColor = .secondaryLabel
         view.numberOfLines = 0
-        return view
-    }()
-    private lazy var serverField: UITextField = {
-        let view = Self.field("Адрес сервера (https://…)")
-        view.keyboardType = .URL
-        view.textContentType = .URL
-        #if DEBUG
-            view.text = "https://zvezdafabrika.ru/matrix-crm"
-        #endif
         return view
     }()
     private lazy var usernameField: UITextField = {
@@ -73,9 +64,9 @@ final class LoginView: UIView {
         return view
     }()
 
-    var credentials: (server: String, username: String, password: String) {
+    var credentials: (username: String, password: String) {
         (
-            serverField.text ?? "", (usernameField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+            (usernameField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
             passwordField.text ?? ""
         )
     }
@@ -89,7 +80,6 @@ final class LoginView: UIView {
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
     func apply(busy: Bool, error: String? = nil) {
-        serverField.isEnabled = !busy
         usernameField.isEnabled = !busy
         passwordField.isEnabled = !busy
         submitButton.isEnabled = !busy
@@ -103,13 +93,13 @@ final class LoginView: UIView {
     private func addSubviews() {
         addSubview(scrollView)
         scrollView.addSubview(stack)
-        [heading, descriptionLabel, serverField, usernameField, passwordField, submitButton, errorLabel].forEach(
+        [heading, descriptionLabel, usernameField, passwordField, submitButton, errorLabel].forEach(
             stack.addArrangedSubview)
     }
     private func makeConstraints() {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
-        [serverField, usernameField, passwordField].forEach {
+        [usernameField, passwordField].forEach {
             $0.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
         }
         NSLayoutConstraint.activate([

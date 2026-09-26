@@ -25,7 +25,7 @@ final class LoginController: UIViewController {
         customView.apply(busy: true)
         task = Task { [weak self, interactor] in
             do {
-                try await interactor.login(server: input.server, username: input.username, password: input.password)
+                try await interactor.login(username: input.username, password: input.password)
                 self?.customView.clearPassword()
                 self?.customView.apply(busy: false)
                 self?.onLogin?()
