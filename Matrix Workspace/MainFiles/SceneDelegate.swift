@@ -2,6 +2,7 @@ import UIKit
 
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
+    private var coordinator: AppCoordinator?
 
     func scene(
         _ scene: UIScene,
@@ -11,8 +12,15 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = AppStartController()
+        let coordinator = AppCoordinator()
+        self.coordinator = coordinator
+        window.rootViewController = coordinator.navigationController
+        coordinator.start()
         window.makeKeyAndVisible()
         self.window = window
     }
+
+    func sceneDidEnterBackground(_ scene: UIScene) { coordinator?.suspend() }
+    func sceneDidBecomeActive(_ scene: UIScene) { coordinator?.resume() }
+    func sceneDidDisconnect(_ scene: UIScene) { coordinator?.stop() }
 }

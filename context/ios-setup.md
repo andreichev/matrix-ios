@@ -1,11 +1,11 @@
 # Подготовка iOS
 
-Актуально на 25.09.2026. Это инструкция, не уже включённые возможности. В каркасе нет entitlements, push-регистрации, фоновых режимов и обращений к серверу.
+Актуально на 25.09.2026. Нативный тестовый клиент уже использует микрофон, AVAudioSession и Background Modes -> Audio. В Info.plist есть описания доступа к микрофону/локальной сети и NSAllowsLocalNetworking для разработки. Push-регистрации, APNs-entitlements и CallKit/PushKit пока нет.
 
 ## Сейчас
 
 1. Открыть `Matrix Workspace.xcodeproj`, target `Matrix Workspace`, Signing & Capabilities. Проверить свою Team и Automatically manage signing. Существующий Bundle ID: `com.andreichev.matrix`; окончательно выбрать его до публикации.
-2. Запустить каркас на симуляторе и своём iPhone. Для этого специальные capabilities не нужны. Apple Developer Portal и App Store Connect агент не изменяет.
+2. Запустить клиент на симуляторе и своём iPhone. Push-capabilities пока не нужны; режим audio уже указан. Apple Developer Portal и App Store Connect агент не изменяет.
 3. Перед распространением определить поддерживаемую iOS (сейчас в исходном проекте 26.5), добавить иконку и создать приложение в App Store Connect с этим Bundle ID. Архивирование и загрузка вручную: Product -> Archive -> Organizer -> Distribute App.
 
 ## Вместе с реализацией звонков и push
@@ -21,7 +21,7 @@
 | Associated Domains | Позже, если понадобятся Universal Links. Потребует файла apple-app-site-association на нашем домене. |
 | App Groups / Keychain Sharing | Только при появлении расширения Share Extension и конкретной необходимости обмена. Обычное хранение Keychain внутри одного приложения не требует включать Keychain Sharing. |
 
-CallKit и PushKit являются frameworks, отдельную галочку «CallKit» искать не нужно. При работе с микрофоном добавим понятный `NSMicrophoneUsageDescription` и запрос разрешения в момент использования. Камеру, геолокацию и доступ ко всем фотографиям заранее не запрашиваем.
+CallKit и PushKit являются frameworks, отдельную галочку «CallKit» искать не нужно. `NSMicrophoneUsageDescription` и запрос при присоединении уже добавлены. Камеру, геолокацию и доступ ко всем фотографиям заранее не запрашиваем.
 
 Входящий VoIP push должен своевременно передаваться в CallKit. Регистрация двух видов токенов (обычный APNs и VoIP) отдельная, с привязкой к сессии устройства, обновлением и удалением при выходе. Просроченные, отменённые и повторные приглашения обрабатываются отдельно. Фоновые режимы не обещают постоянную работу приложения или безусловную доставку уведомлений.
 
