@@ -3,10 +3,10 @@ import UIKit
 @MainActor
 final class CallController: UIViewController {
     private lazy var customView = CallView()
-    private let interactor: CallInteractor
+    let interactor: CallInteractor
 
-    init(target: CallTarget, auth: AuthService, systemCalls: SystemCallService) {
-        interactor = CallInteractor(target: target, auth: auth, systemCalls: systemCalls)
+    init(interactor: CallInteractor) {
+        self.interactor = interactor
         super.init(nibName: nil, bundle: nil)
     }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -17,19 +17,23 @@ final class CallController: UIViewController {
         customView.onJoin = { [weak self] in self?.interactor.retry() }
         customView.onMute = { [weak self] in self?.interactor.toggleMute() }
         customView.onSpeaker = { [weak self] in self?.interactor.toggleSpeaker() }
-        customView.onLeave = { [weak self] in self?.interactor.stop() }
+        customView.onLeave = { [weak self] in
+            guard let self else { return }
+            if self.interactor.state.phase == .ended { self.closeCallScreen() }
+            else { self.interactor.leave() }
+        }
         interactor.onChange = { [weak self] state in
             guard let self else { return }
             self.title = state.call?.title ?? "Звонок"
             self.customView.apply(state)
             if state.phase == .ended, state.error == nil { self.closeCallScreen() }
         }
-        customView.apply(CallScreenState())
+        customView.apply(interactor.state)
         interactor.start()
     }
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        if navigationController?.viewControllers.contains(self) != true { interactor.stop() }
+        if navigationController?.viewControllers.contains(self) != true { interactor.leave() }
     }
     func refresh() { interactor.sync() }
     func stop() { interactor.stop() }

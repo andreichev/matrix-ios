@@ -13,7 +13,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         let window = UIWindow(windowScene: windowScene)
         guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else { return }
-        let coordinator = AppCoordinator(systemCalls: appDelegate.systemCalls)
+        let coordinator = AppCoordinator(services: appDelegate.services)
         self.coordinator = coordinator
         window.rootViewController = coordinator.navigationController
         coordinator.start()
@@ -23,5 +23,5 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidEnterBackground(_ scene: UIScene) { coordinator?.suspend() }
     func sceneDidBecomeActive(_ scene: UIScene) { coordinator?.resume() }
-    func sceneDidDisconnect(_ scene: UIScene) { coordinator?.stop() }
+    func sceneDidDisconnect(_ scene: UIScene) { coordinator?.suspend() }
 }

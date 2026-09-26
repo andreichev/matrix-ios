@@ -3,6 +3,34 @@ import XCTest
 @testable import Matrix_Workspace
 
 final class ProtocolTests: XCTestCase {
+    func testIncomingCallPayload() throws {
+        let callId = UUID(), sessionId = UUID()
+        let expiry = Date().addingTimeInterval(60)
+        let payload: [AnyHashable: Any] = [
+            "callId": callId.uuidString, "sessionId": sessionId.uuidString,
+            "expiresAt": expiry.timeIntervalSince1970 * 1000, "title": String(repeating: "a", count: 250),
+        ]
+        let invitation = try XCTUnwrap(IncomingCall(payload: payload))
+        XCTAssertEqual(invitation.id, callId)
+        XCTAssertEqual(invitation.sessionId, sessionId)
+        XCTAssertEqual(invitation.title.count, 200)
+        XCTAssertEqual(invitation.expiresAt.timeIntervalSince1970, expiry.timeIntervalSince1970, accuracy: 0.001)
+        XCTAssertNil(IncomingCall(payload: [:]))
+        var invalid = payload
+        invalid["sessionId"] = "not-a-session"
+        XCTAssertNil(IncomingCall(payload: invalid))
+    }
+
+    func testSessionIdentityComesFromJWTSessionClaim() throws {
+        let id = UUID()
+        let payload = Data("{\"sid\":\"\(id.uuidString)\"}".utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let session = AuthSession(server: try ServerAddress("https://example.org"), username: "test",
+            tokens: AuthTokens(accessToken: "header.\(payload).signature", expiresAt: "", refreshToken: "", refreshExpiresAt: ""))
+        XCTAssertEqual(session.id, id)
+    }
+
     func testRejectsCredentialsPathsAndInsecureServers() throws {
         for value in [
             "http://example.org", "https://name:secret@example.org", "https://example.org/matrix-mobile",

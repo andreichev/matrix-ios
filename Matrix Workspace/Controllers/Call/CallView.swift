@@ -131,6 +131,7 @@ final class CallView: UIView, UICollectionViewDataSource {
     func apply(_ state: CallScreenState) {
         switch state.phase {
         case .ready: statusLabel.text = state.online ? "Готовы присоединиться?" : "Подключение к серверу…"
+        case .ringing: statusLabel.text = "Входящий звонок"
         case .joining: statusLabel.text = "Подключение к звонку…"
         case .active: statusLabel.text = state.connected ? "В звонке" : "Подключение звука…"
         case .reconnecting: statusLabel.text = "Восстановление связи…"
@@ -138,9 +139,9 @@ final class CallView: UIView, UICollectionViewDataSource {
         }
         errorLabel.text = state.error
         errorLabel.isHidden = state.error == nil
-        joinButton.isHidden = state.phase != .ready && !(state.phase == .active && state.error != nil)
-        joinButton.configuration?.title = state.phase == .active ? "Переподключиться" : "Присоединиться"
-        joinButton.isEnabled = state.online
+        joinButton.isHidden = state.phase != .ready && state.phase != .ringing && !(state.phase == .active && state.error != nil)
+        joinButton.configuration?.title = state.phase == .ringing ? "Ответить" : state.phase == .active ? "Переподключиться" : "Присоединиться"
+        joinButton.isEnabled = state.online || state.phase == .ringing
         muteButton.isEnabled = state.phase == .active && !state.changingMute
         muteButton.configuration?.image = UIImage(systemName: state.muted ? "mic.slash.fill" : "mic.fill")
         muteButton.accessibilityLabel = state.muted ? "Включить микрофон" : "Выключить микрофон"

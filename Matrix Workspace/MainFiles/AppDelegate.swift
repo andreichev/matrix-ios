@@ -2,7 +2,13 @@ import UIKit
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
-    let systemCalls = SystemCallService()
+    let services = AppServices()
+
+    func application(_ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        services.push.start()
+        return true
+    }
 
     func application(
         _ application: UIApplication,

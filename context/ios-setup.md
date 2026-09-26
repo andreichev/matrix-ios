@@ -1,12 +1,12 @@
 # Подготовка iOS
 
-Актуально на 26.09.2026. Нативный клиент использует микрофон, AVAudioSession и Background Modes -> Audio + Voice over IP. Оба режима указаны в Info.plist: `audio` и `voip`. Voice over IP нужен уже для CallKit, а не только для будущего PushKit. Добавлен CallKit для явно открываемых звонков на iPhone; обновление требует сборки и ручной проверки на устройстве. В симуляторе используется прежний аудиорежим без CallKit. В Info.plist есть описания доступа к микрофону/локальной сети и NSAllowsLocalNetworking для разработки. Push-регистрации, APNs-entitlements и PushKit пока нет.
+Актуально на 26.09.2026. Добавлены CallKit, PushKit, регистрация VoIP-токена и APNs-entitlement. Нужна ручная проверка входящих на iPhone. В Info.plist уже включены `audio` и `voip`, описания доступа к микрофону/локальной сети и NSAllowsLocalNetworking для разработки. В симуляторе CallKit и PushKit обходятся. Пошаговая настройка: [ios-push.md](ios-push.md).
 
 ## Сейчас
 
 1. Открыть `Matrix Workspace.xcodeproj`, target `Matrix Workspace`, Signing & Capabilities. Проверить свою Team и Automatically manage signing. Существующий Bundle ID: `com.andreichev.matrix`; окончательно выбрать его до публикации.
-2. Запустить клиент на симуляторе и своём iPhone. Push-capabilities пока не нужны; режимы Audio и Voice over IP уже указаны. Apple Developer Portal и App Store Connect агент не изменяет.
-3. Перед распространением определить поддерживаемую iOS (сейчас в исходном проекте 26.5), добавить иконку и создать приложение в App Store Connect с этим Bundle ID. Архивирование и загрузка вручную: Product -> Archive -> Organizer -> Distribute App.
+2. Включить Push Notifications, проверить профиль подписи и запустить на своём iPhone. Режимы Audio и Voice over IP уже указаны. Apple Developer Portal и App Store Connect агент не изменяет.
+3. Минимальная iOS приложения — 17.6. Перед распространением добавить иконку и создать приложение в App Store Connect с этим Bundle ID. Архивирование и загрузка вручную: Product -> Archive -> Organizer -> Distribute App.
 
 ## Вместе с реализацией звонков и push
 
@@ -14,7 +14,7 @@
 
 | Настройка | Когда и зачем |
 | --- | --- |
-| Push Notifications | При добавлении APNs/PushKit. Xcode настроит entitlement и provisioning; не фиксировать вручную production/development в общем файле. |
+| Push Notifications | Требуется сейчас. Entitlement подключён к APNS_ENVIRONMENT: Debug development, Release production. Xcode должен обновить provisioning для App ID. |
 | Background Modes -> Audio, AirPlay, and Picture in Picture | Для активного аудиозвонка в фоне. Сам флаг не заменяет настройку AVAudioSession и обработку системных прерываний. |
 | Background Modes -> Voice over IP | Уже включён для CallKit. Без `voip` в UIBackgroundModes запрос звонка может отклоняться с `requesttransaction error 1` (unentitled). Не для удержания общего WebSocket приложения в фоне. |
 | Background Modes -> Remote notifications | Только если реализуем фоновые обновления по обычным silent push. Для баннеров и как замена PushKit не нужен. |
@@ -23,7 +23,7 @@
 
 CallKit и PushKit являются frameworks, отдельную галочку «CallKit» искать не нужно. `NSMicrophoneUsageDescription` и запрос при присоединении уже добавлены. Камеру, геолокацию и доступ ко всем фотографиям заранее не запрашиваем.
 
-Для текущего этапа требуются Background Modes -> Audio и Voice over IP; оба включены в проекте. После изменения Info.plist пересобрать и установить приложение на iPhone. Проверить системные кнопки, фон, блокировку, Bluetooth и обычный телефонный вызов по списку в README. Удержание и системный повторный набор пока отключены; входящий при закрытом приложении появится только после PushKit/APNs.
+Для текущего этапа требуются Push Notifications и Background Modes -> Audio + Voice over IP. После настройки подписи установить приложение на iPhone. Проверить системные кнопки, фон, блокировку, Bluetooth и обычный телефонный вызов по списку в README, входящие — по ios-push.md. Удержание и системный повторный набор пока отключены.
 
 Входящий VoIP push должен своевременно передаваться в CallKit. Регистрация двух видов токенов (обычный APNs и VoIP) отдельная, с привязкой к сессии устройства, обновлением и удалением при выходе. Просроченные, отменённые и повторные приглашения обрабатываются отдельно. Фоновые режимы не обещают постоянную работу приложения или безусловную доставку уведомлений.
 
@@ -31,8 +31,8 @@ CallKit и PushKit являются frameworks, отдельную галочк�
 
 - APNs authentication key `.p8` из Apple Developer -> Certificates, Identifiers & Profiles -> Keys с подходящими правами APNs; сохранить Key ID и Team ID. Проверить область действия ключа для нужного приложения/окружения.
 - `.p8` хранить только в защищённых серверных секретах, не в iOS bundle, репозитории или переписке. Bundle ID, Team ID и Key ID сами по себе не являются приватным ключом.
-- При реализации различать sandbox-токены из development-сборок и production-токены TestFlight/App Store. Для VoIP используются отдельный device token, push type `voip` и topic `<bundle-id>.voip`.
-- APNs-ключ не является distribution-сертификатом для подписи приложения. Подписью управляет Xcode отдельно. Сейчас сервер менять и ключи устанавливать не требуется.
+- Sandbox-токены development-сборок и production-токены TestFlight/App Store регистрируются отдельно. Для VoIP используется отдельный device token, push type `voip` и topic `<bundle-id>.voip`.
+- APNs-ключ не является distribution-сертификатом для подписи приложения. Подписью управляет Xcode отдельно. Серверные переменные перечислены в ios-push.md; ключ хранится только на сервере.
 
 ## Firebase и будущий Android
 

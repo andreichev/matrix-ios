@@ -3,7 +3,7 @@ import Foundation
 import CallKit
 
 struct CallScreenState {
-    enum Phase { case ready, joining, active, reconnecting, ended }
+    enum Phase { case ready, ringing, joining, active, reconnecting, ended }
     var phase: Phase = .ready
     var online = false
     var connected = false
@@ -17,13 +17,18 @@ struct CallScreenState {
 @MainActor
 final class CallInteractor: SystemCallDelegate {
     private let target: CallTarget
+    private let auth: AuthService
+    private let incoming: IncomingCall?
+    private var hasJoined = false
+    private var presented = false
+    private var ringTimer: Task<Void, Never>?
     private let socket: CallSocket
     private let systemCalls: SystemCallService
     private var systemCallID = UUID()
     private var sessionId = UUID().uuidString
     private var callId: String?
     private var media: SfuAudioSession?
-    private var state = CallScreenState()
+    private(set) var state = CallScreenState()
     private var wanted = false
     private var stopped = false
     private var generation = 0
@@ -32,15 +37,32 @@ final class CallInteractor: SystemCallDelegate {
     private var muteTask: Task<Void, Never>?
     private var timer: Task<Void, Never>?
     var onChange: ((CallScreenState) -> Void)?
+    var onStopped: (() -> Void)?
+    var onAnswered: (() -> Void)?
 
-    init(target: CallTarget, auth: AuthService, systemCalls: SystemCallService) {
+    init(target: CallTarget, auth: AuthService, systemCalls: SystemCallService, incoming: IncomingCall? = nil) {
         self.target = target
+        self.auth = auth
+        self.incoming = incoming
+        if let incoming {
+            systemCallID = incoming.id
+            state.phase = .ringing
+        }
         self.systemCalls = systemCalls
         socket = CallSocket(auth: auth)
     }
 
     func start() {
         guard timer == nil, !stopped else { return }
+        if let incoming {
+            ringTimer = Task { [weak self] in
+                do { try await Task.sleep(for: .seconds(max(0, min(60, incoming.expiresAt.timeIntervalSinceNow)))) }
+                catch { return }
+                guard let self, !self.wanted else { return }
+                self.systemCalls.end(id: self.systemCallID, reason: .unanswered)
+                self.stop()
+            }
+        }
         socket.onConnection = { [weak self] online in
             guard let self, !self.stopped else { return }
             self.state.online = online
@@ -94,6 +116,12 @@ final class CallInteractor: SystemCallDelegate {
                 guard discovery.enabled else {
                     throw MatrixError.message("Звонки недоступны. Обратитесь к администратору.")
                 }
+                if let incoming = self.incoming, !self.hasJoined {
+                    let invitation = discovery.calls.first { UUID(uuidString: $0.id) == incoming.id }
+                    guard invitation?.myStatus == "INVITED", incoming.expiresAt > Date() else {
+                        throw MatrixError.message("Приглашение уже завершено или принято на другом устройстве.")
+                    }
+                }
                 try self.check(epoch)
                 try await self.systemCalls.start(
                     id: self.systemCallID, title: self.state.call?.title ?? "Матрица", delegate: self)
@@ -102,6 +130,7 @@ final class CallInteractor: SystemCallDelegate {
                 let call = try await self.request(target.command, sessionId: attemptID).decoded(CallSnapshot.self)
                 try self.check(epoch)
                 self.callId = call.id
+                self.hasJoined = true
                 self.state.call = call
                 self.systemCalls.updateTitle(id: self.systemCallID, title: call.title)
                 let media = SfuAudioSession(
@@ -137,6 +166,10 @@ final class CallInteractor: SystemCallDelegate {
                 self.media?.close()
                 self.media = nil
                 self.systemCalls.end(id: self.systemCallID, reason: .failed)
+                if self.incoming != nil {
+                    self.stop(message: error.localizedDescription)
+                    return
+                }
                 self.systemCallID = UUID()
                 self.wanted = false
                 self.state.phase = .ready
@@ -153,6 +186,18 @@ final class CallInteractor: SystemCallDelegate {
 
     func retry() {
         guard !stopped else { return }
+        if incoming != nil, !wanted {
+            Task { [weak self] in
+                guard let self else { return }
+                do { try await self.systemCalls.answer(id: self.systemCallID) }
+                catch {
+                    guard !self.stopped else { return }
+                    self.state.error = error.localizedDescription
+                    self.publish()
+                }
+            }
+            return
+        }
         state.phase = .ready
         join()
     }
@@ -202,7 +247,29 @@ final class CallInteractor: SystemCallDelegate {
         }
     }
 
-    func systemCallDidEnd() { stop() }
+    func systemCallAnswer() {
+        guard !stopped else { return }
+        ringTimer?.cancel()
+        ringTimer = nil
+        wanted = true
+        state.phase = .joining
+        publish()
+        onAnswered?()
+        join()
+    }
+
+    func leave() {
+        guard !stopped else { return }
+        if let incoming, !hasJoined {
+            Task { [auth] in
+                guard auth.current?.id == incoming.sessionId else { return }
+                _ = try? await auth.send("api/v1/calls/\(incoming.id.uuidString.lowercased())/decline")
+            }
+        }
+        stop()
+    }
+
+    func systemCallDidEnd() { leave() }
 
     func toggleSpeaker() {
         guard !stopped, state.phase == .active else { return }
@@ -240,6 +307,11 @@ final class CallInteractor: SystemCallDelegate {
                     case .chat(let id): return call.chatId == id
                     }
                 }
+                if self.incoming != nil, !self.wanted, call?.myStatus != "INVITED" {
+                    self.systemCalls.end(id: self.systemCallID, reason: call?.myStatus == "JOINED" ? .answeredElsewhere : .remoteEnded)
+                    self.stop()
+                    return
+                }
                 if (call == nil && self.callId != nil) || (self.media != nil && call?.joinedHere != true) {
                     self.stop(message: "Звонок завершён или доступ отозван.")
                     return
@@ -250,6 +322,11 @@ final class CallInteractor: SystemCallDelegate {
                 }
                 self.state.call = call
                 self.publish()
+                if self.incoming != nil, !self.presented, let call, call.myStatus == "INVITED" {
+                    _ = try await self.request(["action": .string("presented"), "callId": .string(call.id)])
+                    try self.check(epoch)
+                    self.presented = true
+                }
                 if let call { await self.media?.sync(call, servers: result.iceServers) }
             } catch {
                 if !self.stopped, self.generation == epoch {
@@ -265,6 +342,8 @@ final class CallInteractor: SystemCallDelegate {
         stopped = true
         wanted = false
         invalidateMedia()
+        ringTimer?.cancel()
+        ringTimer = nil
         systemCalls.end(id: systemCallID, reason: message == nil ? nil : .remoteEnded)
         timer?.cancel()
         timer = nil
@@ -279,6 +358,7 @@ final class CallInteractor: SystemCallDelegate {
             _ = try? await socket.request(["action": .string("cancel"), "sessionId": .string(id)])
             socket.stop()
         }
+        onStopped?()
     }
 
     private func request(_ command: [String: JSONValue], sessionId: String? = nil) async throws -> JSONValue {

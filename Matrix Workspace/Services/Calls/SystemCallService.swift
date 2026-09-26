@@ -8,9 +8,10 @@ protocol SystemCallDelegate: AnyObject {
     func systemCallDidEnd()
     func systemCallSetMuted(_ muted: Bool) async throws
     func systemCallAudioRouteChanged(speakerEnabled: Bool)
+    func systemCallAnswer()
 }
 
-// One provider for the application. The screen still owns signaling and media.
+// One provider for the application; signaling and media belong to the active CallInteractor.
 @MainActor
 final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Matrix", category: "CallKit")
@@ -20,6 +21,8 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
     private var callID: UUID?
     private var ending = false
     private var connected = false
+    private var incoming = false
+    private var answerAction: CXAnswerCallAction?
     private var pendingStart: CheckedContinuation<Void, Error>?
     private var muteTask: Task<Void, Never>?
     private var muteAction: CXSetMutedCallAction?
@@ -99,10 +102,56 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
         }
     }
 
+    func reportIncoming(_ invitation: IncomingCall?, delegate: SystemCallDelegate?, completion: @escaping (Bool) -> Void) {
+        let id = invitation?.id ?? UUID()
+        let update = CXCallUpdate()
+        update.localizedCallerName = delegate == nil ? "Матрица" : invitation?.title ?? "Матрица"
+        update.remoteHandle = CXHandle(type: .generic, value: update.localizedCallerName ?? "Матрица")
+        update.hasVideo = false
+        update.supportsHolding = false
+        update.supportsGrouping = false
+        update.supportsUngrouping = false
+        update.supportsDTMF = false
+        let accepted = callID == nil && delegate != nil
+        let duplicate = callID == id
+        if accepted {
+            callID = id
+            self.delegate = delegate
+            incoming = true
+        }
+        // Every VoIP push is reported, before validation/network work. A duplicate UUID
+        // is rejected by CallKit without replacing the existing call or its delegate.
+        provider.reportNewIncomingCall(with: id, update: update) { [weak self] error in
+            Task { @MainActor in
+                guard let self else { completion(false); return }
+                if let error {
+                    self.logger.error("Incoming CallKit report failed: \((error as NSError).code)")
+                    if accepted, self.callID == id { self.clear(error: error) }
+                    completion(false)
+                } else if !accepted || self.callID != id {
+                    if !duplicate { self.provider.reportCall(with: id, endedAt: Date(), reason: .failed) }
+                    completion(false)
+                } else {
+                    completion(true)
+                }
+            }
+        }
+    }
+
+    func answer(id: UUID) async throws {
+        guard callID == id, incoming, !ending else { throw CancellationError() }
+        try await controller.request(CXTransaction(action: CXAnswerCallAction(call: id)))
+    }
+
     func reportConnected(id: UUID) {
         guard callID == id, !ending, !connected else { return }
         connected = true
-        if usesSystemAudio { provider.reportOutgoingCall(with: id, connectedAt: Date()) }
+        if incoming {
+            answerAction?.fulfill(withDateConnected: Date())
+            answerAction = nil
+        } else if usesSystemAudio {
+            provider.reportOutgoingCall(with: id, connectedAt: Date())
+        }
     }
 
     func updateTitle(id: UUID, title: String) {
@@ -192,6 +241,9 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
         delegate = nil
         ending = false
         connected = false
+        incoming = false
+        if let answerAction, !answerAction.isComplete { answerAction.fail() }
+        answerAction = nil
         pendingStart?.resume(throwing: error)
         pendingStart = nil
         muteTask?.cancel()
@@ -238,6 +290,22 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
         action.fulfill()
     }
 
+    func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
+        guard action.callUUID == callID, incoming, !ending, answerAction == nil, let delegate else {
+            action.fail()
+            return
+        }
+        do {
+            try configureAudio()
+            answerAction = action
+            delegate.systemCallAnswer()
+        } catch {
+            action.fail()
+            end(id: action.callUUID, reason: .failed)
+            delegate.systemCallDidEnd()
+        }
+    }
+
     func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
         guard action.callUUID == callID, !ending, muteTask == nil, let delegate else {
             action.fail()
@@ -273,6 +341,7 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
         guard let action = action as? CXCallAction, action.callUUID == callID else { return }
         // A timed-out action must not be fulfilled or failed again.
         if action.uuid == muteAction?.uuid { muteAction = nil }
+        if action.uuid == answerAction?.uuid { answerAction = nil }
         let delegate = delegate
         end(id: action.callUUID, reason: .failed)
         delegate?.systemCallDidEnd()

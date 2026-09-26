@@ -15,9 +15,9 @@ final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
 
-    func send(server: ServerAddress, path: String, body: JSONValue? = nil, token: String? = nil) async throws -> Data {
+    func send(server: ServerAddress, path: String, body: JSONValue? = nil, token: String? = nil, method: String? = nil) async throws -> Data {
         var request = URLRequest(url: server.endpoint(path))
-        request.httpMethod = body == nil ? "GET" : "POST"
+        request.httpMethod = method ?? (body == nil ? "GET" : "POST")
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }

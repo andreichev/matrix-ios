@@ -20,6 +20,17 @@ struct AuthSession: Codable {
     let server: ServerAddress
     let username: String
     let tokens: AuthTokens
+
+    // Identity hint only; authorization is always verified by the backend.
+    var id: UUID? {
+        let parts = tokens.accessToken.split(separator: ".")
+        guard parts.count == 3 else { return nil }
+        var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let data = Data(base64Encoded: payload), let json = try? JSONDecoder().decode(JSONValue.self, from: data),
+            let id = json["sid"].string else { return nil }
+        return UUID(uuidString: id)
+    }
 }
 
 @MainActor
@@ -30,6 +41,7 @@ final class AuthService {
     private var refreshTask: Task<AuthTokens, Error>?
     private var generation = 0
     var onInvalidated: (() -> Void)?
+    var onSessionChanged: (() -> Void)?
 
     init(http: HTTPClient, store: KeychainStore = KeychainStore()) {
         self.http = http
@@ -103,9 +115,27 @@ final class AuthService {
         }
     }
 
+    func send(_ path: String, body: JSONValue? = nil, method: String = "POST") async throws -> Data {
+        guard let server = current?.server else { throw MatrixError.unauthorized }
+        let epoch = generation
+        let token = try await accessToken()
+        try Task.checkCancellation()
+        guard generation == epoch else { throw CancellationError() }
+        do {
+            return try await http.send(server: server, path: path, body: body, token: token, method: method)
+        } catch MatrixError.unauthorized {
+            guard generation == epoch else { throw CancellationError() }
+            let fresh = try await accessToken(forceRefresh: true)
+            try Task.checkCancellation()
+            guard generation == epoch else { throw CancellationError() }
+            return try await http.send(server: server, path: path, body: body, token: fresh, method: method)
+        }
+    }
+
     private func save(_ session: AuthSession) throws {
         try store.write(JSONEncoder().encode(session))
         current = session
+        onSessionChanged?()
     }
 
     private func invalidate() throws {
@@ -114,6 +144,7 @@ final class AuthService {
         refreshTask?.cancel()
         refreshTask = nil
         current = nil
+        onSessionChanged?()
         onInvalidated?()
     }
 }

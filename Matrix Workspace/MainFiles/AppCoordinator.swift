@@ -3,26 +3,25 @@ import UIKit
 @MainActor
 final class AppCoordinator {
     let navigationController = UINavigationController()
-    private let auth = AuthService(http: HTTPClient())
-    private let systemCalls: SystemCallService
+    private let services: AppServices
+    private var auth: AuthService { services.auth }
 
-    init(systemCalls: SystemCallService) { self.systemCalls = systemCalls }
+    init(services: AppServices) { self.services = services }
 
     func start() {
-        auth.onInvalidated = { [weak self] in self?.showLogin() }
-        do {
-            try auth.restore()
-            if auth.current == nil { showLogin() } else { showCalls() }
-        } catch { showLogin(error: error.localizedDescription) }
+        services.onInvalidated = { [weak self] in self?.showLogin() }
+        services.calls.onOpen = { [weak self] call in self?.showCall(call) }
+        if auth.current == nil { showLogin(error: services.restoreError) } else { showCalls() }
     }
 
     func suspend() { (navigationController.topViewController as? CallsListController)?.suspend() }
     func resume() {
+        services.push.synchronize()
         (navigationController.topViewController as? CallsListController)?.resume()
         (navigationController.topViewController as? CallController)?.refresh()
     }
     func stop() {
-        (navigationController.topViewController as? CallController)?.stop()
+        services.calls.stop()
         suspend()
     }
 
@@ -37,9 +36,7 @@ final class AppCoordinator {
     private func showCalls() {
         let controller = CallsListController(auth: auth)
         controller.onSelect = { [weak self] target in
-            guard let self else { return }
-            self.navigationController.pushViewController(
-                CallController(target: target, auth: self.auth, systemCalls: self.systemCalls), animated: true)
+            self?.services.calls.open(target)
         }
         controller.onLogoutError = { [weak self] error in
             guard let self else { return }
@@ -52,5 +49,15 @@ final class AppCoordinator {
             }
         }
         navigationController.setViewControllers([controller], animated: false)
+        if let call = services.calls.active { showCall(call) }
+    }
+
+    private func showCall(_ call: CallInteractor) {
+        if let current = navigationController.topViewController as? CallController, current.interactor === call { return }
+        if navigationController.topViewController is CallController {
+            navigationController.popViewController(animated: false)
+        }
+        navigationController.pushViewController(CallController(interactor: call),
+            animated: UIApplication.shared.applicationState == .active)
     }
 }
