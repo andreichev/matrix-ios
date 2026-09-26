@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import CallKit
 
 struct CallScreenState {
     enum Phase { case ready, joining, active, reconnecting, ended }
@@ -13,9 +14,11 @@ struct CallScreenState {
 }
 
 @MainActor
-final class CallInteractor {
+final class CallInteractor: SystemCallDelegate {
     private let target: CallTarget
     private let socket: CallSocket
+    private let systemCalls: SystemCallService
+    private var systemCallID = UUID()
     private var sessionId = UUID().uuidString
     private var callId: String?
     private var media: SfuAudioSession?
@@ -29,8 +32,9 @@ final class CallInteractor {
     private var timer: Task<Void, Never>?
     var onChange: ((CallScreenState) -> Void)?
 
-    init(target: CallTarget, auth: AuthService) {
+    init(target: CallTarget, auth: AuthService, systemCalls: SystemCallService) {
         self.target = target
+        self.systemCalls = systemCalls
         socket = CallSocket(auth: auth)
     }
 
@@ -90,13 +94,18 @@ final class CallInteractor {
                     throw MatrixError.message("Звонки недоступны. Обратитесь к администратору.")
                 }
                 try self.check(epoch)
+                try await self.systemCalls.start(
+                    id: self.systemCallID, title: self.state.call?.title ?? "Матрица", delegate: self)
+                try self.check(epoch)
                 let target = self.callId.map(CallTarget.call) ?? self.target
                 let call = try await self.request(target.command, sessionId: attemptID).decoded(CallSnapshot.self)
                 try self.check(epoch)
                 self.callId = call.id
                 self.state.call = call
+                self.systemCalls.updateTitle(id: self.systemCallID, title: call.title)
                 let media = SfuAudioSession(
                     callId: call.id, iceServers: discovery.iceServers,
+                    systemManagedAudio: self.systemCalls.usesSystemAudio,
                     command: { [socket = self.socket] command in
                         var command = command
                         command["sessionId"] = .string(attemptID)
@@ -110,6 +119,7 @@ final class CallInteractor {
                     onConnection: { [weak self] connected in
                         guard let self, self.generation == epoch, !self.stopped else { return }
                         self.state.connected = connected
+                        if connected { self.systemCalls.reportConnected(id: self.systemCallID) }
                         self.publish()
                     })
                 self.media = media
@@ -117,10 +127,15 @@ final class CallInteractor {
                 try self.check(epoch)
                 self.state.phase = .active
                 self.publish()
+                if self.state.muted {
+                    try await self.systemCalls.setMuted(id: self.systemCallID, muted: true)
+                }
             } catch {
                 guard !self.stopped, self.generation == epoch else { return }
                 self.media?.close()
                 self.media = nil
+                self.systemCalls.end(id: self.systemCallID, reason: .failed)
+                self.systemCallID = UUID()
                 self.wanted = false
                 self.state.phase = .ready
                 self.state.connected = false
@@ -141,23 +156,51 @@ final class CallInteractor {
     }
 
     func toggleMute() {
-        guard !stopped, !state.changingMute, state.phase == .active, let media else { return }
+        guard !stopped, !state.changingMute, state.phase == .active else { return }
         let muted = !state.muted
-        if muted { state.muted = true }
         state.changingMute = true
         let epoch = generation
         publish()
         muteTask = Task { [weak self] in
             do {
-                try await media.setMuted(muted)
+                guard let self else { return }
+                try await self.systemCalls.setMuted(id: self.systemCallID, muted: muted)
+            } catch {
                 guard let self, self.generation == epoch else { return }
-                self.state.muted = muted
-            } catch { if self?.generation == epoch { self?.state.error = error.localizedDescription } }
-            guard let self, self.generation == epoch else { return }
-            self.state.changingMute = false
-            self.publish()
+                self.state.error = error.localizedDescription
+                self.state.changingMute = false
+                self.publish()
+            }
         }
     }
+
+    func systemCallSetMuted(_ muted: Bool) async throws {
+        guard !stopped, state.phase == .active, let media else {
+            state.changingMute = false
+            publish()
+            throw MatrixError.message("Дождитесь подключения к звонку.")
+        }
+        let epoch = generation
+        state.changingMute = true
+        if muted { state.muted = true }
+        publish()
+        do {
+            try await media.setMuted(muted)
+            try check(epoch)
+            state.muted = muted
+            state.changingMute = false
+            publish()
+        } catch {
+            if generation == epoch, !stopped {
+                // Do not leave the system mute indicator out of sync with actual capture.
+                systemCalls.end(id: systemCallID, reason: .failed)
+                stop(message: error.localizedDescription)
+            }
+            throw error
+        }
+    }
+
+    func systemCallDidEnd() { stop() }
 
     func sync() {
         guard !stopped, socket.isOnline, syncTask == nil, joinTask == nil else { return }
@@ -204,6 +247,7 @@ final class CallInteractor {
         stopped = true
         wanted = false
         invalidateMedia()
+        systemCalls.end(id: systemCallID, reason: message == nil ? nil : .remoteEnded)
         timer?.cancel()
         timer = nil
         socket.onConnection = nil

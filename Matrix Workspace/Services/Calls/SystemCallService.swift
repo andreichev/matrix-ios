@@ -1,0 +1,249 @@
+import AVFoundation
+import CallKit
+import WebRTC
+
+@MainActor
+protocol SystemCallDelegate: AnyObject {
+    func systemCallDidEnd()
+    func systemCallSetMuted(_ muted: Bool) async throws
+}
+
+// One provider for the application. The screen still owns signaling and media.
+@MainActor
+final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
+    private let provider: CXProvider
+    private let controller = CXCallController()
+    private weak var delegate: SystemCallDelegate?
+    private var callID: UUID?
+    private var ending = false
+    private var connected = false
+    private var pendingStart: CheckedContinuation<Void, Error>?
+    private var muteTask: Task<Void, Never>?
+    private var muteAction: CXSetMutedCallAction?
+    private var pendingMute: (id: UUID, continuation: CheckedContinuation<Void, Error>)?
+
+    var usesSystemAudio: Bool {
+        #if targetEnvironment(simulator)
+            return false
+        #else
+            return true
+        #endif
+    }
+
+    override init() {
+        let configuration = CXProviderConfiguration()
+        configuration.supportedHandleTypes = [.generic]
+        configuration.maximumCallGroups = 1
+        configuration.maximumCallsPerCallGroup = 1
+        configuration.supportsVideo = false
+        // Recents redial needs separate routing, which is not implemented yet.
+        configuration.includesCallsInRecents = false
+        provider = CXProvider(configuration: configuration)
+        super.init()
+        provider.setDelegate(self, queue: .main)
+    }
+
+    func start(id: UUID, title: String, delegate: SystemCallDelegate) async throws {
+        try Task.checkCancellation()
+        if callID == id, !ending { return }
+        guard callID == nil else { throw MatrixError.message("Сначала завершите текущий звонок.") }
+        if usesSystemAudio { try configureAudio() }
+        callID = id
+        self.delegate = delegate
+        guard usesSystemAudio else { return }
+        let action = CXStartCallAction(call: id, handle: CXHandle(type: .generic, value: title))
+        action.isVideo = false
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                pendingStart = continuation
+                controller.request(CXTransaction(action: action)) { [weak self] error in
+                    Task { @MainActor in
+                        guard let self, self.callID == id, let error else { return }
+                        self.clear(error: error)
+                    }
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.end(id: id) }
+        }
+    }
+
+    func reportConnected(id: UUID) {
+        guard callID == id, !ending, !connected else { return }
+        connected = true
+        if usesSystemAudio { provider.reportOutgoingCall(with: id, connectedAt: Date()) }
+    }
+
+    func updateTitle(id: UUID, title: String) {
+        guard callID == id, !ending, usesSystemAudio else { return }
+        let update = CXCallUpdate()
+        update.localizedCallerName = title
+        provider.reportCall(with: id, updated: update)
+    }
+
+    func setMuted(id: UUID, muted: Bool) async throws {
+        guard callID == id, !ending else { throw CancellationError() }
+        if !usesSystemAudio {
+            guard let delegate else { throw CancellationError() }
+            try await delegate.systemCallSetMuted(muted)
+            return
+        }
+        guard pendingMute == nil, muteTask == nil else {
+            throw MatrixError.message("Дождитесь изменения микрофона.")
+        }
+        let action = CXSetMutedCallAction(call: id, muted: muted)
+        try await withCheckedThrowingContinuation { continuation in
+            pendingMute = (action.uuid, continuation)
+            controller.request(CXTransaction(action: action)) { [weak self] error in
+                Task { @MainActor in
+                    if let error { self?.finishMute(id: action.uuid, result: .failure(error)) }
+                }
+            }
+        }
+    }
+
+    func end(id: UUID, reason: CXCallEndedReason? = nil) {
+        guard callID == id else { return }
+        guard usesSystemAudio else {
+            clear()
+            return
+        }
+        if let reason {
+            provider.reportCall(with: id, endedAt: Date(), reason: reason)
+            clear()
+            return
+        }
+        guard !ending else { return }
+        ending = true
+        RTCAudioSession.sharedInstance().isAudioEnabled = false
+        pendingStart?.resume(throwing: CancellationError())
+        pendingStart = nil
+        controller.request(CXTransaction(action: CXEndCallAction(call: id))) { [weak self] error in
+            Task { @MainActor in
+                guard let self, self.callID == id, error != nil else { return }
+                self.provider.reportCall(with: id, endedAt: Date(), reason: .failed)
+                let delegate = self.delegate
+                self.clear()
+                delegate?.systemCallDidEnd()
+            }
+        }
+    }
+
+    private func configureAudio() throws {
+        let audio = RTCAudioSession.sharedInstance()
+        audio.useManualAudio = true
+        audio.isAudioEnabled = false
+        audio.lockForConfiguration()
+        defer { audio.unlockForConfiguration() }
+        let configuration = RTCAudioSessionConfiguration.webRTC()
+        configuration.category = AVAudioSession.Category.playAndRecord.rawValue
+        configuration.mode = AVAudioSession.Mode.voiceChat.rawValue
+        configuration.categoryOptions = [.allowBluetoothHFP, .defaultToSpeaker]
+        // CallKit activates the session; do not call setActive here or in MediaWorker.
+        try audio.setConfiguration(configuration)
+    }
+
+    private func clear(error: Error = CancellationError()) {
+        RTCAudioSession.sharedInstance().isAudioEnabled = false
+        callID = nil
+        delegate = nil
+        ending = false
+        connected = false
+        pendingStart?.resume(throwing: error)
+        pendingStart = nil
+        muteTask?.cancel()
+        muteTask = nil
+        if let muteAction, !muteAction.isComplete { muteAction.fail() }
+        muteAction = nil
+        if let pendingMute { finishMute(id: pendingMute.id, result: .failure(error)) }
+    }
+
+    private func finishMute(id: UUID, result: Result<Void, Error>) {
+        guard let pendingMute, pendingMute.id == id else { return }
+        self.pendingMute = nil
+        pendingMute.continuation.resume(with: result)
+    }
+
+    func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+        guard action.callUUID == callID, !ending, pendingStart != nil else {
+            action.fail()
+            return
+        }
+        let update = CXCallUpdate()
+        update.localizedCallerName = action.handle.value
+        update.remoteHandle = action.handle
+        update.hasVideo = false
+        update.supportsHolding = false
+        update.supportsGrouping = false
+        update.supportsUngrouping = false
+        update.supportsDTMF = false
+        provider.reportCall(with: action.callUUID, updated: update)
+        provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date())
+        action.fulfill()
+        pendingStart?.resume()
+        pendingStart = nil
+    }
+
+    func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
+        guard action.callUUID == callID else {
+            action.fail()
+            return
+        }
+        let delegate = delegate
+        clear()
+        delegate?.systemCallDidEnd()
+        action.fulfill()
+    }
+
+    func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
+        guard action.callUUID == callID, !ending, muteTask == nil, let delegate else {
+            action.fail()
+            finishMute(id: action.uuid, result: .failure(MatrixError.message("Микрофон сейчас недоступен.")))
+            return
+        }
+        muteAction = action
+        muteTask = Task { [weak self] in
+            do {
+                try await delegate.systemCallSetMuted(action.isMuted)
+                guard !Task.isCancelled, !action.isComplete else { return }
+                action.fulfill()
+                self?.finishMute(id: action.uuid, result: .success(()))
+            } catch {
+                if !Task.isCancelled, !action.isComplete {
+                    action.fail()
+                    self?.finishMute(id: action.uuid, result: .failure(error))
+                }
+            }
+            guard !Task.isCancelled else { return }
+            self?.muteAction = nil
+            self?.muteTask = nil
+        }
+    }
+
+    func providerDidReset(_ provider: CXProvider) {
+        let delegate = delegate
+        clear()
+        delegate?.systemCallDidEnd()
+    }
+
+    func provider(_ provider: CXProvider, timedOutPerforming action: CXAction) {
+        guard let action = action as? CXCallAction, action.callUUID == callID else { return }
+        // A timed-out action must not be fulfilled or failed again.
+        if action.uuid == muteAction?.uuid { muteAction = nil }
+        let delegate = delegate
+        end(id: action.callUUID, reason: .failed)
+        delegate?.systemCallDidEnd()
+    }
+
+    func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        let audio = RTCAudioSession.sharedInstance()
+        audio.audioSessionDidActivate(audioSession)
+        audio.isAudioEnabled = callID != nil && !ending
+    }
+
+    func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+        let audio = RTCAudioSession.sharedInstance()
+        audio.isAudioEnabled = false
+        audio.audioSessionDidDeactivate(audioSession)
+    }
+}

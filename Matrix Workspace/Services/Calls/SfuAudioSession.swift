@@ -8,6 +8,7 @@ final class SfuAudioSession {
     private let onError: (String) -> Void
     private let onConnection: (Bool) -> Void
     private let callId: String
+    private let systemManagedAudio: Bool
     private var worker: MediaWorker?
     private var capabilities: JSONValue = .null
     private var connected: [String: Task<Void, Error>] = [:]
@@ -21,11 +22,12 @@ final class SfuAudioSession {
     private var iceServers: JSONValue
 
     init(
-        callId: String, iceServers: JSONValue, command: @escaping Command,
+        callId: String, iceServers: JSONValue, systemManagedAudio: Bool = false, command: @escaping Command,
         onError: @escaping (String) -> Void, onConnection: @escaping (Bool) -> Void
     ) {
         self.callId = callId
         self.iceServers = iceServers
+        self.systemManagedAudio = systemManagedAudio
         self.command = command
         self.onError = onError
         self.onConnection = onConnection
@@ -65,7 +67,7 @@ final class SfuAudioSession {
                 Task { @MainActor [weak self] in self?.transportChanged(id, state: state) }
             })
         self.worker = worker
-        capabilities = try await worker.load(capabilities: call.rtpCapabilities)
+        capabilities = try await worker.load(capabilities: call.rtpCapabilities, systemManagedAudio: systemManagedAudio)
         try checkOpen()
         let sending = try await media("createTransport", ["direction": .string("send")]).decoded(
             MediaTransportOptions.self)

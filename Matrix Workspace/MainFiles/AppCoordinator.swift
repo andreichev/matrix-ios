@@ -4,6 +4,9 @@ import UIKit
 final class AppCoordinator {
     let navigationController = UINavigationController()
     private let auth = AuthService(http: HTTPClient())
+    private let systemCalls: SystemCallService
+
+    init(systemCalls: SystemCallService) { self.systemCalls = systemCalls }
 
     func start() {
         auth.onInvalidated = { [weak self] in self?.showLogin() }
@@ -36,7 +39,7 @@ final class AppCoordinator {
         controller.onSelect = { [weak self] target in
             guard let self else { return }
             self.navigationController.pushViewController(
-                CallController(target: target, auth: self.auth), animated: true)
+                CallController(target: target, auth: self.auth, systemCalls: self.systemCalls), animated: true)
         }
         controller.onLogoutError = { [weak self] error in
             guard let self else { return }

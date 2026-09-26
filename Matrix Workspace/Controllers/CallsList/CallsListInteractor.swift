@@ -4,7 +4,7 @@ struct CallsListState {
     var chats: [ChatSummary] = []
     var calls: [CallSnapshot] = []
     var online = false
-    var enabled = false
+    var enabled: Bool?
     var error: String?
 }
 
@@ -28,6 +28,7 @@ final class CallsListInteractor {
         socket.onConnection = { [weak self] online in
             guard let self else { return }
             self.state.online = online
+            self.state.enabled = nil
             self.onChange?(self.state)
             if online { self.sync() }
         }

@@ -1,6 +1,6 @@
 # Подготовка iOS
 
-Актуально на 25.09.2026. Нативный тестовый клиент уже использует микрофон, AVAudioSession и Background Modes -> Audio. В Info.plist есть описания доступа к микрофону/локальной сети и NSAllowsLocalNetworking для разработки. Push-регистрации, APNs-entitlements и CallKit/PushKit пока нет.
+Актуально на 26.09.2026. Нативный клиент использует микрофон, AVAudioSession и Background Modes -> Audio. Добавлен CallKit для явно открываемых звонков на iPhone; обновление требует сборки и ручной проверки на устройстве. В симуляторе используется прежний аудиорежим без CallKit. В Info.plist есть описания доступа к микрофону/локальной сети и NSAllowsLocalNetworking для разработки. Push-регистрации, APNs-entitlements и PushKit пока нет.
 
 ## Сейчас
 
@@ -22,6 +22,8 @@
 | App Groups / Keychain Sharing | Только при появлении расширения Share Extension и конкретной необходимости обмена. Обычное хранение Keychain внутри одного приложения не требует включать Keychain Sharing. |
 
 CallKit и PushKit являются frameworks, отдельную галочку «CallKit» искать не нужно. `NSMicrophoneUsageDescription` и запрос при присоединении уже добавлены. Камеру, геолокацию и доступ ко всем фотографиям заранее не запрашиваем.
+
+Для текущего этапа дополнительных capabilities не требуется. Проверить системные кнопки, фон, блокировку, Bluetooth и обычный телефонный вызов по списку в README. Удержание и системный повторный набор пока отключены; входящий при закрытом приложении появится только после PushKit/APNs.
 
 Входящий VoIP push должен своевременно передаваться в CallKit. Регистрация двух видов токенов (обычный APNs и VoIP) отдельная, с привязкой к сессии устройства, обновлением и удалением при выходе. Просроченные, отменённые и повторные приглашения обрабатываются отдельно. Фоновые режимы не обещают постоянную работу приложения или безусловную доставку уведомлений.
 
@@ -46,6 +48,9 @@ FCM можно использовать и для обычных iOS-уведо�
 
 ## Источники
 
+- [Apple: один CXProvider на приложение](https://developer.apple.com/documentation/callkit/cxprovider).
+- [Apple: активация аудиосессии CallKit](https://developer.apple.com/documentation/callkit/cxproviderdelegate/provider(_:didactivate:)).
+- [WebRTC: ручное аудио и callbacks внешней активации](https://webrtc.googlesource.com/src/+/e8d5724cc5ee0b593a996477c7230bba3dc4d7bc/sdk/objc/components/audio/RTCAudioSession.h).
 - [Apple: настройка PushKit](https://developer.apple.com/documentation/pushkit/supporting-pushkit-notifications-in-your-app).
 - [Apple: обработка VoIP и CallKit](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
 - [Apple: фоновые уведомления](https://developer.apple.com/documentation/usernotifications/pushing-background-updates-to-your-app).

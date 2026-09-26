@@ -12,7 +12,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
-        let coordinator = AppCoordinator()
+        guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else { return }
+        let coordinator = AppCoordinator(systemCalls: appDelegate.systemCalls)
         self.coordinator = coordinator
         window.rootViewController = coordinator.navigationController
         coordinator.start()

@@ -37,13 +37,17 @@ final class CallsListView: UIView, UITableViewDataSource, UITableViewDelegate {
 
     func apply(_ state: CallsListState) {
         self.state = state
-        statusLabel.text =
-            state.error
-            ?? (!state.online
-                ? "Подключение…"
-                : !state.enabled
-                    ? "Звонки отключены. Обратитесь к администратору."
-                    : "Выберите чат для звонка. Микрофон включится только после присоединения.")
+        if let error = state.error {
+            statusLabel.text = error
+        } else if !state.online {
+            statusLabel.text = "Подключение…"
+        } else if let enabled = state.enabled {
+            statusLabel.text = enabled
+                ? "Выберите чат для звонка. Микрофон включится только после присоединения."
+                : "Звонки отключены. Обратитесь к администратору."
+        } else {
+            statusLabel.text = "Проверка доступности звонков…"
+        }
         refreshControl.endRefreshing()
         tableView.reloadData()
     }
@@ -86,12 +90,12 @@ final class CallsListView: UIView, UITableViewDataSource, UITableViewDelegate {
         }
         cell.contentConfiguration = content
         cell.accessoryType = .disclosureIndicator
-        cell.selectionStyle = state.online && state.enabled ? .default : .none
+        cell.selectionStyle = state.online && state.enabled == true ? .default : .none
         return cell
     }
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        guard state.online, state.enabled else { return }
+        guard state.online, state.enabled == true else { return }
         onSelect?(indexPath.section == 0 ? .call(state.calls[indexPath.row].id) : .chat(state.chats[indexPath.row].id))
     }
 }

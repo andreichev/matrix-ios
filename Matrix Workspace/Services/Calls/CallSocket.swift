@@ -11,7 +11,7 @@ final class CallSocket {
     private var socket: URLSessionWebSocketTask?
     private var connectionTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
-    private var pending: [String: Pending] = [:]
+    private var pending: [UUID: Pending] = [:]
     private var generation = 0
     private var pongAt = Date.distantPast
     private(set) var isOnline = false
@@ -54,9 +54,9 @@ final class CallSocket {
         try Task.checkCancellation()
         guard isOnline, let socket else { throw MatrixError.message("Нет соединения с сервером.") }
         guard pending.count < 32 else { throw MatrixError.message("Слишком много действий звонка.") }
-        let id = UUID().uuidString
+        let id = UUID()
         var payload = command
-        payload["commandId"] = .string(id)
+        payload["commandId"] = .string(id.uuidString)
         let frame = try JSONValue.object(["type": .string("call"), "payload": .object(payload)]).json()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -131,7 +131,7 @@ final class CallSocket {
         case "calls_changed": onChanged?()
         case "call_reply":
             let payload = message["payload"]
-            guard let id = payload["commandId"].string else { return }
+            guard let value = payload["commandId"].string, let id = UUID(uuidString: value) else { return }
             if payload["ok"].bool == true {
                 finish(id, result: .success(payload["data"]))
             } else {
@@ -141,7 +141,7 @@ final class CallSocket {
         }
     }
 
-    private func finish(_ id: String, result: Result<JSONValue, Error>) {
+    private func finish(_ id: UUID, result: Result<JSONValue, Error>) {
         guard let item = pending.removeValue(forKey: id) else { return }
         item.timeout.cancel()
         item.continuation.resume(with: result)

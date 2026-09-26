@@ -57,18 +57,21 @@ final class MediaWorker: SendTransportDelegate, ReceiveTransportDelegate, @unche
         }
     }
 
-    func load(capabilities: JSONValue) async throws -> JSONValue {
+    func load(capabilities: JSONValue, systemManagedAudio: Bool = false) async throws -> JSONValue {
         try await perform {
             guard !self.closed else { throw CancellationError() }
-            let audio = RTCAudioSession.sharedInstance()
-            audio.lockForConfiguration()
-            defer { audio.unlockForConfiguration() }
-            let config = RTCAudioSessionConfiguration.webRTC()
-            config.category = AVAudioSession.Category.playAndRecord.rawValue
-            config.mode = AVAudioSession.Mode.voiceChat.rawValue
-            config.categoryOptions = [.allowBluetoothHFP, .defaultToSpeaker]
-            try audio.setConfiguration(config, active: true)
-            self.audioActive = true
+            if !systemManagedAudio {
+                let audio = RTCAudioSession.sharedInstance()
+                audio.lockForConfiguration()
+                defer { audio.unlockForConfiguration() }
+                audio.useManualAudio = false
+                let config = RTCAudioSessionConfiguration.webRTC()
+                config.category = AVAudioSession.Category.playAndRecord.rawValue
+                config.mode = AVAudioSession.Mode.voiceChat.rawValue
+                config.categoryOptions = [.allowBluetoothHFP, .defaultToSpeaker]
+                try audio.setConfiguration(config, active: true)
+                self.audioActive = true
+            }
             let device = Device(pcFactory: self.factory)
             self.device = device
             try device.load(with: capabilities.json())
