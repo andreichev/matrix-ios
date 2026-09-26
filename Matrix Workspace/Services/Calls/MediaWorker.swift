@@ -68,7 +68,7 @@ final class MediaWorker: SendTransportDelegate, ReceiveTransportDelegate, @unche
                 let config = RTCAudioSessionConfiguration.webRTC()
                 config.category = AVAudioSession.Category.playAndRecord.rawValue
                 config.mode = AVAudioSession.Mode.voiceChat.rawValue
-                config.categoryOptions = [.allowBluetoothHFP, .defaultToSpeaker]
+                config.categoryOptions = [.allowBluetoothHFP]
                 try audio.setConfiguration(config, active: true)
                 self.audioActive = true
             }

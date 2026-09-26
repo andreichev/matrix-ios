@@ -4,6 +4,7 @@ import UIKit
 final class CallView: UIView, UICollectionViewDataSource {
     var onJoin: (() -> Void)?
     var onMute: (() -> Void)?
+    var onSpeaker: (() -> Void)?
     var onLeave: (() -> Void)?
     private var participants: [ParticipantDisplayModel] = []
 
@@ -84,6 +85,15 @@ final class CallView: UIView, UICollectionViewDataSource {
         view.addAction(UIAction { [weak self] _ in self?.onMute?() }, for: .touchUpInside)
         return view
     }()
+    private lazy var speakerButton: UIButton = {
+        var config = UIButton.Configuration.filled()
+        config.image = UIImage(systemName: "speaker.wave.3.fill")
+        config.buttonSize = .large
+        config.cornerStyle = .capsule
+        let view = UIButton(configuration: config)
+        view.addAction(UIAction { [weak self] _ in self?.onSpeaker?() }, for: .touchUpInside)
+        return view
+    }()
     private lazy var leaveButton: UIButton = {
         var config = UIButton.Configuration.filled()
         config.image = UIImage(systemName: "phone.down.fill")
@@ -134,6 +144,12 @@ final class CallView: UIView, UICollectionViewDataSource {
         muteButton.isEnabled = state.phase == .active && !state.changingMute
         muteButton.configuration?.image = UIImage(systemName: state.muted ? "mic.slash.fill" : "mic.fill")
         muteButton.accessibilityLabel = state.muted ? "Включить микрофон" : "Выключить микрофон"
+        speakerButton.isEnabled = state.phase == .active
+        speakerButton.isSelected = state.speakerEnabled
+        speakerButton.configuration?.baseBackgroundColor = state.speakerEnabled ? .systemBlue : .secondarySystemFill
+        speakerButton.configuration?.baseForegroundColor = state.speakerEnabled ? .white : .label
+        speakerButton.accessibilityLabel = state.speakerEnabled ? "Выключить громкую связь" : "Включить громкую связь"
+        speakerButton.accessibilityValue = state.speakerEnabled ? "Включена" : "Выключена"
         participants =
             state.call?.participants.flatMap { person in
                 person.connections.map { connection in
@@ -154,6 +170,7 @@ final class CallView: UIView, UICollectionViewDataSource {
         addSubview(collectionView)
         addSubview(footer)
         buttons.addArrangedSubview(muteButton)
+        buttons.addArrangedSubview(speakerButton)
         buttons.addArrangedSubview(leaveButton)
         [pageControl, errorLabel, joinButton, buttons].forEach(footer.addArrangedSubview)
     }
@@ -173,6 +190,8 @@ final class CallView: UIView, UICollectionViewDataSource {
             errorLabel.widthAnchor.constraint(equalTo: footer.widthAnchor),
             muteButton.widthAnchor.constraint(equalToConstant: 64),
             muteButton.heightAnchor.constraint(equalToConstant: 56),
+            speakerButton.widthAnchor.constraint(equalToConstant: 64),
+            speakerButton.heightAnchor.constraint(equalToConstant: 56),
             leaveButton.widthAnchor.constraint(equalToConstant: 64),
             leaveButton.heightAnchor.constraint(equalToConstant: 56),
         ])

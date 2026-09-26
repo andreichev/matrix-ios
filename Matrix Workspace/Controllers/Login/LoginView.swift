@@ -38,7 +38,7 @@ final class LoginView: UIView {
         view.keyboardType = .URL
         view.textContentType = .URL
         #if DEBUG
-            view.text = "http://localhost:8080"
+            view.text = "https://zvezdafabrika.ru/matrix-crm"
         #endif
         return view
     }()

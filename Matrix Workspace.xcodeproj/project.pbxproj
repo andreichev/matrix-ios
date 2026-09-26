@@ -10,9 +10,19 @@
 		AA0000000000000000000001 /* Mediasoup in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000003 /* Mediasoup */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		BB000000000000000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 42423CE73065514C00A5D6A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 42423CEE3065514C00A5D6A3;
+			remoteInfo = "Matrix Workspace";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
-		BB0000000000000000000001 /* MatrixTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = MatrixTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		42423CEF3065514C00A5D6A3 /* Matrix Workspace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Matrix Workspace.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0000000000000000000001 /* MatrixTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = MatrixTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -26,7 +36,6 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		BB0000000000000000000002 /* Tests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tests; sourceTree = "<group>"; };
 		42423CF13065514C00A5D6A3 /* Matrix Workspace */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -35,15 +44,26 @@
 			path = "Matrix Workspace";
 			sourceTree = "<group>";
 		};
+		BB0000000000000000000002 /* Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		BB0000000000000000000006 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		42423CEC3065514C00A5D6A3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				AA0000000000000000000001 /* Mediasoup in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,18 +91,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		BB0000000000000000000003 /* MatrixTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = BB0000000000000000000004;
-			buildPhases = (BB0000000000000000000005, BB0000000000000000000006,);
-			buildRules = ();
-			dependencies = (BB0000000000000000000007,);
-			fileSystemSynchronizedGroups = (BB0000000000000000000002,);
-			name = MatrixTests;
-			productName = MatrixTests;
-			productReference = BB0000000000000000000001;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
 		42423CEE3065514C00A5D6A3 /* Matrix Workspace */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 42423D023065514D00A5D6A3 /* Build configuration list for PBXNativeTarget "Matrix Workspace" */;
@@ -105,6 +113,26 @@
 			productName = "Matrix Workspace";
 			productReference = 42423CEF3065514C00A5D6A3 /* Matrix Workspace.app */;
 			productType = "com.apple.product-type.application";
+		};
+		BB0000000000000000000003 /* MatrixTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB0000000000000000000004 /* Build configuration list for PBXNativeTarget "MatrixTests" */;
+			buildPhases = (
+				BB0000000000000000000005 /* Sources */,
+				BB0000000000000000000006 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BB0000000000000000000007 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				BB0000000000000000000002 /* Tests */,
+			);
+			name = MatrixTests;
+			productName = MatrixTests;
+			productReference = BB0000000000000000000001 /* MatrixTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -131,8 +159,10 @@
 			);
 			mainGroup = 42423CE63065514C00A5D6A3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AA0000000000000000000002 /* XCRemoteSwiftPackageReference "mediasoup-client-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
-			packageReferences = (AA0000000000000000000002 /* mediasoup-client-swift */,);
 			productRefGroup = 42423CF03065514C00A5D6A3 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -154,8 +184,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		BB0000000000000000000005 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		42423CEB3065514C00A5D6A3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000000000000000000005 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -164,37 +200,15 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		BB0000000000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 42423CEE3065514C00A5D6A3 /* Matrix Workspace */;
+			targetProxy = BB000000000000000000000A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
-		BB0000000000000000000008 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Matrix Workspace.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Matrix Workspace";
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.andreichev.matrix.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks",);
-			};
-			name = Debug;
-		};
-		BB0000000000000000000009 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Matrix Workspace.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Matrix Workspace";
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.andreichev.matrix.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks",);
-			};
-			name = Release;
-		};
 		42423D033065514D00A5D6A3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -209,6 +223,7 @@
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -239,6 +254,7 @@
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -376,10 +392,47 @@
 			};
 			name = Release;
 		};
+		BB0000000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.andreichev.matrix.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Matrix Workspace.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Matrix Workspace";
+			};
+			name = Debug;
+		};
+		BB0000000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.andreichev.matrix.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Matrix Workspace.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Matrix Workspace";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		BB0000000000000000000004 = {isa = XCConfigurationList; buildConfigurations = (BB0000000000000000000008, BB0000000000000000000009,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		42423CEA3065514C00A5D6A3 /* Build configuration list for PBXProject "Matrix Workspace" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -398,24 +451,35 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		BB0000000000000000000004 /* Build configuration list for PBXNativeTarget "MatrixTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB0000000000000000000008 /* Debug */,
+				BB0000000000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		AA0000000000000000000002 /* mediasoup-client-swift */ = {
+		AA0000000000000000000002 /* XCRemoteSwiftPackageReference "mediasoup-client-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/VLprojects/mediasoup-client-swift";
-			requirement = {kind = exactVersion; version = 0.13.2; };
+			requirement = {
+				kind = exactVersion;
+				version = 0.13.2;
+			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		AA0000000000000000000003 /* Mediasoup */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = AA0000000000000000000002;
+			package = AA0000000000000000000002 /* XCRemoteSwiftPackageReference "mediasoup-client-swift" */;
 			productName = Mediasoup;
 		};
 /* End XCSwiftPackageProductDependency section */
-		BB0000000000000000000007 = {isa = PBXTargetDependency; target = 42423CEE3065514C00A5D6A3; targetProxy = BB000000000000000000000A; };
-		BB000000000000000000000A = {isa = PBXContainerItemProxy; containerPortal = 42423CE73065514C00A5D6A3; proxyType = 1; remoteGlobalIDString = 42423CEE3065514C00A5D6A3; remoteInfo = "Matrix Workspace"; };
 	};
 	rootObject = 42423CE73065514C00A5D6A3 /* Project object */;
 }

@@ -1,16 +1,19 @@
 import AVFoundation
 import CallKit
+import OSLog
 import WebRTC
 
 @MainActor
 protocol SystemCallDelegate: AnyObject {
     func systemCallDidEnd()
     func systemCallSetMuted(_ muted: Bool) async throws
+    func systemCallAudioRouteChanged(speakerEnabled: Bool)
 }
 
 // One provider for the application. The screen still owns signaling and media.
 @MainActor
 final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Matrix", category: "CallKit")
     private let provider: CXProvider
     private let controller = CXCallController()
     private weak var delegate: SystemCallDelegate?
@@ -21,6 +24,11 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
     private var muteTask: Task<Void, Never>?
     private var muteAction: CXSetMutedCallAction?
     private var pendingMute: (id: UUID, continuation: CheckedContinuation<Void, Error>)?
+    private var routeObserver: NSObjectProtocol?
+
+    var isSpeakerEnabled: Bool {
+        RTCAudioSession.sharedInstance().currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
+    }
 
     var usesSystemAudio: Bool {
         #if targetEnvironment(simulator)
@@ -41,6 +49,29 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
         provider = CXProvider(configuration: configuration)
         super.init()
         provider.setDelegate(self, queue: .main)
+        routeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.notifyAudioRoute() }
+        }
+    }
+
+    deinit {
+        if let routeObserver { NotificationCenter.default.removeObserver(routeObserver) }
+    }
+
+    func setSpeaker(id: UUID, enabled: Bool) throws {
+        guard callID == id, !ending else { throw CancellationError() }
+        let audio = RTCAudioSession.sharedInstance()
+        audio.lockForConfiguration()
+        defer { audio.unlockForConfiguration() }
+        try audio.overrideOutputAudioPort(enabled ? .speaker : .none)
+        notifyAudioRoute()
+    }
+
+    private func notifyAudioRoute() {
+        guard callID != nil, !ending else { return }
+        delegate?.systemCallAudioRouteChanged(speakerEnabled: isSpeakerEnabled)
     }
 
     func start(id: UUID, title: String, delegate: SystemCallDelegate) async throws {
@@ -59,7 +90,7 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
                 controller.request(CXTransaction(action: action)) { [weak self] error in
                     Task { @MainActor in
                         guard let self, self.callID == id, let error else { return }
-                        self.clear(error: error)
+                        self.clear(error: self.transactionError(error, operation: "start"))
                     }
                 }
             }
@@ -96,7 +127,8 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
             pendingMute = (action.uuid, continuation)
             controller.request(CXTransaction(action: action)) { [weak self] error in
                 Task { @MainActor in
-                    if let error { self?.finishMute(id: action.uuid, result: .failure(error)) }
+                    guard let self, let error else { return }
+                    self.finishMute(id: action.uuid, result: .failure(self.transactionError(error, operation: "mute")))
                 }
             }
         }
@@ -120,13 +152,24 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
         pendingStart = nil
         controller.request(CXTransaction(action: CXEndCallAction(call: id))) { [weak self] error in
             Task { @MainActor in
-                guard let self, self.callID == id, error != nil else { return }
+                guard let self, self.callID == id, let error else { return }
+                _ = self.transactionError(error, operation: "end")
                 self.provider.reportCall(with: id, endedAt: Date(), reason: .failed)
                 let delegate = self.delegate
                 self.clear()
                 delegate?.systemCallDidEnd()
             }
         }
+    }
+
+    private func transactionError(_ error: Error, operation: String) -> Error {
+        let error = error as NSError
+        logger.error("Transaction \(operation, privacy: .public) failed: \(error.domain, privacy: .public), code \(error.code)")
+        if error.domain == CXErrorDomainRequestTransaction,
+            error.code == CXErrorCodeRequestTransactionError.Code.unentitled.rawValue {
+            return MatrixError.message("iOS не разрешила звонок. Проверьте Background Modes → Voice over IP и подпись приложения в Xcode.")
+        }
+        return error
     }
 
     private func configureAudio() throws {
@@ -138,7 +181,7 @@ final class SystemCallService: NSObject, @preconcurrency CXProviderDelegate {
         let configuration = RTCAudioSessionConfiguration.webRTC()
         configuration.category = AVAudioSession.Category.playAndRecord.rawValue
         configuration.mode = AVAudioSession.Mode.voiceChat.rawValue
-        configuration.categoryOptions = [.allowBluetoothHFP, .defaultToSpeaker]
+        configuration.categoryOptions = [.allowBluetoothHFP]
         // CallKit activates the session; do not call setActive here or in MediaWorker.
         try audio.setConfiguration(configuration)
     }

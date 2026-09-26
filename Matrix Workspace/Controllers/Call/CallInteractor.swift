@@ -9,6 +9,7 @@ struct CallScreenState {
     var connected = false
     var muted = false
     var changingMute = false
+    var speakerEnabled = false
     var call: CallSnapshot?
     var error: String?
 }
@@ -126,6 +127,7 @@ final class CallInteractor: SystemCallDelegate {
                 try await media.start(call, muted: self.state.muted)
                 try self.check(epoch)
                 self.state.phase = .active
+                self.state.speakerEnabled = self.systemCalls.isSpeakerEnabled
                 self.publish()
                 if self.state.muted {
                     try await self.systemCalls.setMuted(id: self.systemCallID, muted: true)
@@ -201,6 +203,22 @@ final class CallInteractor: SystemCallDelegate {
     }
 
     func systemCallDidEnd() { stop() }
+
+    func toggleSpeaker() {
+        guard !stopped, state.phase == .active else { return }
+        do {
+            try systemCalls.setSpeaker(id: systemCallID, enabled: !systemCalls.isSpeakerEnabled)
+        } catch {
+            state.error = error.localizedDescription
+            publish()
+        }
+    }
+
+    func systemCallAudioRouteChanged(speakerEnabled: Bool) {
+        guard !stopped else { return }
+        state.speakerEnabled = speakerEnabled
+        publish()
+    }
 
     func sync() {
         guard !stopped, socket.isOnline, syncTask == nil, joinTask == nil else { return }

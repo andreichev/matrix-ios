@@ -25,7 +25,8 @@ final class CallsListController: UIViewController {
     }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        interactor.start()
+        // Returning from a system-ended call can reveal this screen while the phone is locked.
+        if UIApplication.shared.applicationState != .background { interactor.start() }
     }
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)

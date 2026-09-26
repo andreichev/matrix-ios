@@ -16,13 +16,13 @@ final class CallController: UIViewController {
         title = "Звонок"
         customView.onJoin = { [weak self] in self?.interactor.retry() }
         customView.onMute = { [weak self] in self?.interactor.toggleMute() }
-        customView.onLeave = { [weak self] in
-            self?.interactor.stop()
-            self?.navigationController?.popViewController(animated: true)
-        }
+        customView.onSpeaker = { [weak self] in self?.interactor.toggleSpeaker() }
+        customView.onLeave = { [weak self] in self?.interactor.stop() }
         interactor.onChange = { [weak self] state in
-            self?.title = state.call?.title ?? "Звонок"
-            self?.customView.apply(state)
+            guard let self else { return }
+            self.title = state.call?.title ?? "Звонок"
+            self.customView.apply(state)
+            if state.phase == .ended, state.error == nil { self.closeCallScreen() }
         }
         customView.apply(CallScreenState())
         interactor.start()
@@ -33,4 +33,10 @@ final class CallController: UIViewController {
     }
     func refresh() { interactor.sync() }
     func stop() { interactor.stop() }
+
+    private func closeCallScreen() {
+        guard let navigationController, navigationController.topViewController === self else { return }
+        let animated = view.window?.windowScene?.activationState == .foregroundActive
+        navigationController.popViewController(animated: animated)
+    }
 }
