@@ -3,10 +3,16 @@ import Foundation
 @MainActor
 final class LoginInteractor {
     private let auth: AuthService
-    init(auth: AuthService) { self.auth = auth }
+    let directory: OrganizationDirectoryService
+    init(auth: AuthService) {
+        self.auth = auth
+        directory = OrganizationDirectoryService(http: auth.http)
+    }
 
-    func login(username: String, password: String) async throws {
+    func login(organization: OrganizationSelection, username: String, password: String) async throws {
         guard !username.isEmpty, !password.isEmpty else { throw MatrixError.message("Укажите логин и пароль.") }
-        try await auth.login(server: .configured, username: username, password: password)
+        let server = try ServerAddress(organization.baseUrl)
+        try await auth.login(server: server, username: username, password: password)
+        directory.remember(OrganizationSelection(name: organization.name, baseUrl: server.url.absoluteString))
     }
 }

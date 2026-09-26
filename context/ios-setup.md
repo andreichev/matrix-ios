@@ -6,7 +6,7 @@
 
 1. Открыть `Matrix Workspace.xcodeproj`, target `Matrix Workspace`, Signing & Capabilities. Проверить свою Team и Automatically manage signing. Существующий Bundle ID: `com.andreichev.matrix`; окончательно выбрать его до публикации.
 2. Включить Push Notifications, проверить профиль подписи и запустить на своём iPhone. Режимы Audio и Voice over IP уже указаны. Apple Developer Portal и App Store Connect агент не изменяет.
-3. Минимальная iOS приложения — 17.6. Перед распространением добавить иконку и создать приложение в App Store Connect с этим Bundle ID. Архивирование и загрузка вручную: Product -> Archive -> Organizer -> Distribute App.
+3. Минимальная iOS приложения — 17.6. AppIcon использует знак Матрицы без привязки к организации. Перед распространением проверить приложение в App Store Connect с этим Bundle ID. Архивирование и загрузка вручную: Product -> Archive -> Organizer -> Distribute App.
 
 ## Вместе с реализацией звонков и push
 
@@ -45,6 +45,23 @@ CallKit и PushKit являются frameworks, отдельную галочк�
 Firebase-проект можно создать позже вместе с Android. Сначала выбрать Android package name; затем зарегистрировать приложение и настроить FCM HTTP v1 и серверную авторизацию. Серверные service-account credentials нельзя помещать в мобильное приложение.
 
 FCM можно использовать и для обычных iOS-уведомлений, но он всё равно доставляет их через APNs и требует настройки Apple. Наш план VoIP предусматривает прямой APNs/PushKit, поэтому ради одинакового названия push-сервиса добавлять Firebase в iOS сейчас не стоит.
+
+## Декларация шифрования
+
+В `Info.plist` указано `ITSAppUsesNonExemptEncryption = false`: освобождение от
+предоставления документов Apple, а не отсутствие шифрования. Приложение использует
+HTTPS средствами iOS и стандартное шифрование DTLS/SRTP в сторонней библиотеке
+WebRTC/BoringSSL. В ручной анкете этому соответствует вариант 2 (стандартные
+алгоритмы помимо средств ОС), не вариант 4.
+
+Пользователь подтвердил: распространения во Франции не будет. Францию необходимо
+исключить в App Store Connect; сам флаг не ограничивает страны распространения.
+Для уже загруженной сборки анкету нужно завершить вручную; флаг применяется к новым
+сборкам. При изменении криптографии или добавлении Франции декларацию пересмотреть.
+Флаг не заменяет проверку иных применимых экспортных обязанностей.
+
+Основания: [документы по типу шифрования](https://developer.apple.com/help/app-store-connect/reference/app-information/export-compliance-documentation-for-encryption)
+и [настройка Info.plist](https://developer.apple.com/documentation/security/complying-with-encryption-export-regulations).
 
 ## Источники
 

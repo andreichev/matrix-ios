@@ -3,6 +3,7 @@ import UIKit
 @MainActor
 final class LoginView: UIView {
     var onSubmit: (() -> Void)?
+    var onChooseOrganization: (() -> Void)?
 
     private lazy var scrollView: UIScrollView = {
         let view = UIScrollView()
@@ -26,11 +27,39 @@ final class LoginView: UIView {
     }()
     private lazy var descriptionLabel: UILabel = {
         let view = UILabel()
-        view.text = "Войдите в свою учётную запись Матрицы."
+        view.text = "Выберите организацию и войдите в свою учётную запись."
         view.font = .preferredFont(forTextStyle: .body)
         view.adjustsFontForContentSizeCategory = true
         view.textColor = .secondaryLabel
         view.numberOfLines = 0
+        return view
+    }()
+    private lazy var organizationButton: UIButton = {
+        var config = UIButton.Configuration.tinted()
+        config.title = "Выбрать организацию"
+        config.image = UIImage(systemName: "chevron.down")
+        config.imagePlacement = .trailing
+        config.imagePadding = 12
+        config.buttonSize = .large
+        let view = UIButton(configuration: config)
+        view.contentHorizontalAlignment = .leading
+        view.addAction(UIAction { [weak self] _ in self?.onChooseOrganization?() }, for: .touchUpInside)
+        return view
+    }()
+    private lazy var serverLabel: UILabel = {
+        let view = UILabel()
+        view.font = .preferredFont(forTextStyle: .subheadline)
+        view.adjustsFontForContentSizeCategory = true
+        view.textColor = .secondaryLabel
+        view.numberOfLines = 0
+        view.isHidden = true
+        return view
+    }()
+    private lazy var serverField: UITextField = {
+        let view = Self.field("Адрес сервера, например matrix.example.ru")
+        view.keyboardType = .URL
+        view.textContentType = .URL
+        view.isHidden = true
         return view
     }()
     private lazy var usernameField: UITextField = {
@@ -70,6 +99,7 @@ final class LoginView: UIView {
             passwordField.text ?? ""
         )
     }
+    var serverAddress: String { serverField.text ?? "" }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -80,6 +110,8 @@ final class LoginView: UIView {
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
     func apply(busy: Bool, error: String? = nil) {
+        organizationButton.isEnabled = !busy
+        serverField.isEnabled = !busy
         usernameField.isEnabled = !busy
         passwordField.isEnabled = !busy
         submitButton.isEnabled = !busy
@@ -88,19 +120,33 @@ final class LoginView: UIView {
         errorLabel.isHidden = error == nil
     }
     func clearPassword() { passwordField.text = nil }
+    func clearCredentials() {
+        usernameField.text = nil
+        clearPassword()
+    }
+    func apply(organization: OrganizationSelection?) {
+        organizationButton.configuration?.title = organization?.title ?? "Выбрать организацию"
+        serverLabel.text = organization?.baseUrl
+        serverLabel.isHidden = organization?.name == nil
+        serverField.isHidden = organization == nil || organization?.name != nil
+        serverField.text = organization?.baseUrl
+    }
 
     private func setupStyle() { backgroundColor = .systemBackground }
     private func addSubviews() {
         addSubview(scrollView)
         scrollView.addSubview(stack)
-        [heading, descriptionLabel, usernameField, passwordField, submitButton, errorLabel].forEach(
+        [heading, descriptionLabel, organizationButton, serverLabel, serverField,
+            usernameField, passwordField, submitButton, errorLabel].forEach(
             stack.addArrangedSubview)
     }
     private func makeConstraints() {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
-        [usernameField, passwordField].forEach {
-            $0.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
+        [serverField, usernameField, passwordField].forEach {
+            let height = $0.heightAnchor.constraint(greaterThanOrEqualToConstant: 48)
+            height.priority = .defaultHigh
+            height.isActive = true
         }
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),

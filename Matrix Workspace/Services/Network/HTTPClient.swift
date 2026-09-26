@@ -1,5 +1,11 @@
 import Foundation
 
+struct HTTPResponseError: LocalizedError {
+    let status: Int
+    let message: String
+    var errorDescription: String? { message }
+}
+
 final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     static let userAgent = "Matrix-iOS/1.0 (iPhone; iOS)"
     // Ephemeral storage: credentials and authenticated responses never enter a disk cache.
@@ -15,8 +21,11 @@ final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
 
-    func send(server: ServerAddress, path: String, body: JSONValue? = nil, token: String? = nil, method: String? = nil) async throws -> Data {
-        var request = URLRequest(url: server.endpoint(path))
+    func send(server: ServerAddress, path: String, body: JSONValue? = nil, token: String? = nil, method: String? = nil,
+        queryItems: [URLQueryItem] = []) async throws -> Data {
+        var components = URLComponents(url: server.endpoint(path), resolvingAgainstBaseURL: false)!
+        if !queryItems.isEmpty { components.queryItems = queryItems }
+        var request = URLRequest(url: components.url!)
         request.httpMethod = method ?? (body == nil ? "GET" : "POST")
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -32,7 +41,7 @@ final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         if response.statusCode == 401 { throw MatrixError.unauthorized }
         guard (200..<300).contains(response.statusCode) else {
             let message = (try? JSONDecoder().decode(JSONValue.self, from: data))?["message"].string
-            throw MatrixError.message(message ?? "Ошибка сервера: \(response.statusCode).")
+            throw HTTPResponseError(status: response.statusCode, message: message ?? "Ошибка сервера: \(response.statusCode).")
         }
         return data
     }

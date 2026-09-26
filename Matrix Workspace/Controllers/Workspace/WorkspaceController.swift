@@ -11,7 +11,7 @@ final class WorkspaceController: UIViewController, WKNavigationDelegate, WKUIDel
     private lazy var documents = WebDocumentService(presenter: self)
     private lazy var customView: WorkspaceView = {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = WKWebsiteDataStore(forIdentifier: sessionId)
+        config.websiteDataStore = WebDataStoreService.dataStore(for: sessionId)
         config.allowsInlineMediaPlayback = true
         config.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "matrix")
         return WorkspaceView(configuration: config)

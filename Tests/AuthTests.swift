@@ -49,15 +49,18 @@ final class AuthTests: XCTestCase {
         return (auth, store)
     }
 
-    func testRestoreDiscardsSessionFromAnotherServer() throws {
+    func testRestoreKeepsSelectedOrganizationAndRefreshesOnlyThere() async throws {
         let (auth, store) = try setupSession(server: ServerAddress("https://other.example.org"))
         defer {
             try? store.clear()
             auth.http.session.invalidateAndCancel()
         }
-        XCTAssertNil(auth.current)
-        XCTAssertNil(try store.read())
+        XCTAssertEqual(auth.current?.server.url.host, "other.example.org")
+        XCTAssertNotNil(try store.read())
         XCTAssertTrue(MockHTTP.requests.isEmpty)
+        _ = try await auth.accessToken()
+        XCTAssertEqual(MockHTTP.requests.count, 1)
+        XCTAssertEqual(MockHTTP.requests.first?.url?.host, "other.example.org")
     }
 
     func testConcurrentRefreshUsesOneRequestAndPersistsRotation() async throws {

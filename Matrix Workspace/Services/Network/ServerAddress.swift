@@ -2,11 +2,8 @@ import Foundation
 
 struct ServerAddress: Codable, Equatable, Sendable {
     static let configured: ServerAddress = {
-        #if DEBUG
-            return try! ServerAddress("http://localhost:8080")
-        #else
-            return try! ServerAddress("https://zvezdafabrika.ru")
-        #endif
+        // return try! ServerAddress("http://localhost:8080")
+        return try! ServerAddress("https://zvezdafabrika.ru")
     }()
 
     let url: URL
@@ -20,11 +17,11 @@ struct ServerAddress: Codable, Equatable, Sendable {
             throw MatrixError.message("Укажите адрес сервера без пути, например https://matrix.example.ru.")
         }
         var allowed = parts.scheme == "https"
-        #if DEBUG
+        #if targetEnvironment(simulator)
             allowed = allowed || (parts.scheme == "http" && ["localhost", "127.0.0.1", "[::1]"].contains(host))
         #endif
         guard allowed else {
-            throw MatrixError.message("Для подключения нужен HTTPS. В Debug разрешён HTTP только для localhost.")
+            throw MatrixError.message("Для подключения нужен HTTPS. В симуляторе разрешён HTTP только для localhost.")
         }
         self.url = url
     }

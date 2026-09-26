@@ -7,15 +7,17 @@ import UIKit
 final class VoipPushService: NSObject, @preconcurrency PKPushRegistryDelegate {
     private let auth: AuthService
     private let calls: NativeCallCoordinator
+    private let hub: HubPushService
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Matrix", category: "PushKit")
     private var registry: PKPushRegistry?
     private var token: String?
     private var registered: String?
     private var registration: Task<Void, Never>?
 
-    init(auth: AuthService, calls: NativeCallCoordinator) {
+    init(auth: AuthService, calls: NativeCallCoordinator, hub: HubPushService) {
         self.auth = auth
         self.calls = calls
+        self.hub = hub
         super.init()
     }
 
@@ -38,7 +40,7 @@ final class VoipPushService: NSObject, @preconcurrency PKPushRegistryDelegate {
             return
         }
         let key = "\(session.server.url.absoluteString)|\(id)|\(token)"
-        guard registered != key, registration == nil else { return }
+        guard registration == nil else { return }
         guard let environment = Bundle.main.object(forInfoDictionaryKey: "APNSEnvironment") as? String,
             environment == "development" || environment == "production" else {
             logger.error("Missing APNSEnvironment build setting")
@@ -51,6 +53,13 @@ final class VoipPushService: NSObject, @preconcurrency PKPushRegistryDelegate {
                     _ = await AVAudioApplication.requestRecordPermission()
                 }
                 try Task.checkCancellation()
+                if try await self?.hub.updateVoip(token: token) == true {
+                    self?.registered = nil
+                    self?.registration = nil
+                    if self?.token != token || auth.current?.id != id { self?.synchronize() }
+                    return
+                }
+                if self?.registered == key { self?.registration = nil; return }
                 let data = try await auth.send("api/v1/calls/push/device", body: .object([
                     "token": .string(token),
                     "environment": .string(environment == "development" ? "SANDBOX" : "PRODUCTION"),
@@ -83,10 +92,11 @@ final class VoipPushService: NSObject, @preconcurrency PKPushRegistryDelegate {
         registered = nil
         registration?.cancel()
         registration = nil
-        Task { [auth, logger] in
+        Task { [auth, logger, hub] in
             guard let oldToken, let sessionId, auth.current?.id == sessionId,
                 environment == "development" || environment == "production" else { return }
             do {
+                if try await hub.updateVoip(token: nil) { return }
                 _ = try await auth.send("api/v1/calls/push/device", body: .object([
                     "token": .string(oldToken),
                     "environment": .string(environment == "development" ? "SANDBOX" : "PRODUCTION"),

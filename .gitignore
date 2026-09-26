@@ -4,6 +4,8 @@
 # Xcode user-specific settings
 xcuserdata/
 
+screenshots/
+
 # Xcode
 *.pbxuser
 !default.pbxuser

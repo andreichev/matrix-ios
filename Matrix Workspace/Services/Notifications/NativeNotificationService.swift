@@ -5,6 +5,7 @@ import UserNotifications
 @MainActor
 final class NativeNotificationService: NSObject, @preconcurrency UNUserNotificationCenterDelegate {
     private let auth: AuthService
+    private let hub: HubPushService
     private let center = UNUserNotificationCenter.current()
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Matrix", category: "Notifications")
     private var token: String?
@@ -15,8 +16,9 @@ final class NativeNotificationService: NSObject, @preconcurrency UNUserNotificat
     private var pending: (session: UUID, route: String)?
     var onOpen: ((String) -> Void)? { didSet { openPending() } }
 
-    init(auth: AuthService) {
+    init(auth: AuthService, hub: HubPushService) {
         self.auth = auth
+        self.hub = hub
         super.init()
         center.delegate = self
     }
@@ -79,6 +81,7 @@ final class NativeNotificationService: NSObject, @preconcurrency UNUserNotificat
         default: "NOT_DETERMINED"
         }
         let key = "\(session)|\(token ?? "")|\(status)"
+        if try await hub.updateAlert(token: token, permission: status) { registered = nil; return }
         guard registered != key, auth.current?.id == session else { return }
         _ = try await auth.send("api/v1/notifications/push/ios", body: .object([
             "environment": .string(environment == "development" ? "SANDBOX" : "PRODUCTION"),

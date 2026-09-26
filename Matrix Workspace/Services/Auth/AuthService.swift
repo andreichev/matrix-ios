@@ -51,11 +51,8 @@ final class AuthService {
     func restore() throws {
         guard let data = try store.read() else { return }
         let session = try JSONDecoder().decode(AuthSession.self, from: data)
-        // Never reuse credentials from another environment.
-        guard session.server.url.standardized == ServerAddress.configured.url.standardized else {
-            try store.clear()
-            return
-        }
+        // Restore only the saved origin, never substitute an address from the directory.
+        _ = try ServerAddress(session.server.url.absoluteString)
         current = session
     }
 
