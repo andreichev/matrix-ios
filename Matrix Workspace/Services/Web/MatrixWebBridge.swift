@@ -1,4 +1,5 @@
 import WebKit
+import UIKit
 
 @MainActor
 final class MatrixWebBridge: NSObject, @preconcurrency WKScriptMessageHandlerWithReply {
@@ -12,9 +13,19 @@ final class MatrixWebBridge: NSObject, @preconcurrency WKScriptMessageHandlerWit
     }
 
     func isApplication(_ url: URL?) -> Bool {
+        guard let url, isSameOrigin(url) else { return false }
+        let path = url.standardized.path
+        return path == "/matrix-mobile" || path.hasPrefix("/matrix-mobile/")
+    }
+
+    func isSameOrigin(_ url: URL?) -> Bool {
         guard let url else { return false }
         return url.scheme == server.url.scheme && url.host == server.url.host && url.port == server.url.port
-            && url.user == nil && url.password == nil && url.path.hasPrefix("/matrix-mobile/")
+            && url.user == nil && url.password == nil
+    }
+
+    func isLocalBlob(_ url: URL) -> Bool {
+        url.scheme == "blob" && isSameOrigin(URL(string: String(url.absoluteString.dropFirst(5))))
     }
 
     func applicationURL(route: String = "/") -> URL {
@@ -30,7 +41,7 @@ final class MatrixWebBridge: NSObject, @preconcurrency WKScriptMessageHandlerWit
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
         replyHandler: @escaping (Any?, String?) -> Void) {
-        guard message.frameInfo.isMainFrame, isApplication(message.frameInfo.request.url),
+        guard let sessionId, message.frameInfo.isMainFrame, isApplication(message.frameInfo.request.url),
             isApplication(message.webView?.url), auth.current?.id == sessionId,
             let body = message.body as? [String: Any], let action = body["action"] as? String else {
             replyHandler(nil, "Недопустимый источник запроса")
@@ -45,6 +56,11 @@ final class MatrixWebBridge: NSObject, @preconcurrency WKScriptMessageHandlerWit
                     replyHandler(["accessToken": token, "expiresAt": auth.current?.tokens.expiresAt ?? ""], nil)
                 case "logout":
                     try await auth.logout()
+                    replyHandler(true, nil)
+                case "notificationSettings":
+                    if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                        await UIApplication.shared.open(url)
+                    }
                     replyHandler(true, nil)
                 case "openCall":
                     if let value = body["chatId"] as? String, let id = UUID(uuidString: value) {

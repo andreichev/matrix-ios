@@ -12,7 +12,7 @@ final class AppCoordinator {
     func start() {
         services.onInvalidated = { [weak self] in self?.showLogin() }
         services.calls.onOpen = { [weak self] call in self?.showCall(call) }
-        if auth.current == nil { showLogin(error: services.restoreError) } else { showCalls() }
+        if auth.current == nil { showLogin(error: services.restoreError) } else { showWorkspace() }
         services.notifications.onOpen = { [weak self] route in self?.workspace?.open(route: route) }
     }
 
@@ -31,15 +31,16 @@ final class AppCoordinator {
 
     private func showLogin(error: String? = nil) {
         stop()
+        workspace?.stop()
         workspace = nil
         navigationController.setNavigationBarHidden(false, animated: false)
         let controller = LoginController(auth: auth)
-        controller.onLogin = { [weak self] in self?.showCalls() }
+        controller.onLogin = { [weak self] in self?.showWorkspace() }
         navigationController.setViewControllers([controller], animated: false)
         if let error { controller.showError(error) }
     }
 
-    private func showCalls() {
+    private func showWorkspace() {
         guard let server = auth.current?.server else { return }
         let controller = WorkspaceController(auth: auth, calls: services.calls, server: server)
         workspace = controller

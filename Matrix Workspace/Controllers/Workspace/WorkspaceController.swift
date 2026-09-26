@@ -6,6 +6,7 @@ final class WorkspaceController: UIViewController, WKNavigationDelegate, WKUIDel
     private let bridge: MatrixWebBridge
     private var route = "/"
     private var active = true
+    private lazy var documents = WebDocumentService(presenter: self)
     private lazy var customView: WorkspaceView = {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
@@ -45,7 +46,15 @@ final class WorkspaceController: UIViewController, WKNavigationDelegate, WKUIDel
     func setActive(_ active: Bool) {
         self.active = active
         guard isViewLoaded else { return }
-        customView.webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('matrix-native:active', {detail: \(active)}))", completionHandler: nil)
+        customView.webView.evaluateJavaScript("window.matrixNativeActive = \(active); window.dispatchEvent(new CustomEvent('matrix-native:active', {detail: \(active)}))", completionHandler: nil)
+    }
+    func stop() {
+        if isViewLoaded {
+            customView.webView.stopLoading()
+            customView.webView.configuration.userContentController.removeScriptMessageHandler(forName: "matrix", contentWorld: .page)
+            documents.stop()
+        }
+        dismiss(animated: false)
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { setActive(active) }
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
@@ -55,14 +64,29 @@ final class WorkspaceController: UIViewController, WKNavigationDelegate, WKUIDel
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        if bridge.isLocalBlob(url), navigationAction.targetFrame?.isMainFrame != false {
+            decisionHandler(.download)
+            return
+        }
         if navigationAction.targetFrame?.isMainFrame == false {
             decisionHandler(.allow)
         } else if bridge.isApplication(url) {
             decisionHandler(.allow)
         } else {
             decisionHandler(.cancel)
-            if ["https", "mailto", "tel"].contains(url.scheme ?? "") { UIApplication.shared.open(url) }
+            if navigationAction.navigationType == .linkActivated,
+                ["https", "mailto", "tel"].contains(url.scheme ?? "") {
+                UIApplication.shared.open(url)
+            } else if !bridge.isApplication(webView.url) {
+                customView.showError("Не удалось открыть Матрицу: сервер перенаправил на адрес вне приложения.")
+            }
         }
+    }
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        documents.receive(download)
+    }
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        documents.receive(download)
     }
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
         for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {

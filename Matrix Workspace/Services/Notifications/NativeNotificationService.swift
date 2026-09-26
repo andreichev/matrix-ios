@@ -10,6 +10,7 @@ final class NativeNotificationService: NSObject, @preconcurrency UNUserNotificat
     private var token: String?
     private var registered: String?
     private var task: Task<Void, Never>?
+    private var generation = 0
     private var permission: UNAuthorizationStatus = .notDetermined
     private var pending: (session: UUID, route: String)?
     var onOpen: ((String) -> Void)? { didSet { openPending() } }
@@ -22,14 +23,17 @@ final class NativeNotificationService: NSObject, @preconcurrency UNUserNotificat
 
     func synchronize() {
         guard let session = auth.current?.id else {
+            generation += 1
             task?.cancel(); task = nil; registered = nil; pending = nil
             center.removeAllDeliveredNotifications()
             return
         }
         guard task == nil else { return }
+        generation += 1
+        let epoch = generation
         task = Task { [weak self] in
             guard let self else { return }
-            defer { self.task = nil }
+            defer { if self.generation == epoch { self.task = nil } }
             do {
                 var settings = await self.center.notificationSettings()
                 if settings.authorizationStatus == .notDetermined, UIApplication.shared.applicationState == .active {

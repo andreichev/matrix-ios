@@ -5,7 +5,11 @@
 	<key>APNSEnvironment</key>
 	<string>$(APNS_ENVIRONMENT)</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Микрофон нужен для участия в аудиозвонках Матрицы.</string>
+	<string>Микрофон нужен для звонков и записи голосовых сообщений в Матрице.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Камера нужна, чтобы прикреплять фотографии и видео к сообщениям и документам.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Фотографии нужны для выбора вложений и изображения профиля.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Подключение к тестовому серверу Матрицы в локальной сети.</string>
 	<key>NSAppTransportSecurity</key>

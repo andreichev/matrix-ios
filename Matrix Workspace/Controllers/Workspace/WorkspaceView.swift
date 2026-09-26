@@ -6,6 +6,7 @@ final class WorkspaceView: UIView {
     private let configuration: WKWebViewConfiguration
     lazy var webView: WKWebView = {
         let view = WKWebView(frame: .zero, configuration: configuration)
+        view.customUserAgent = HTTPClient.userAgent
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.allowsBackForwardNavigationGestures = true
         return view

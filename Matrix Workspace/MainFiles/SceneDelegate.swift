@@ -22,6 +22,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) { coordinator?.suspend() }
+    func sceneWillResignActive(_ scene: UIScene) { coordinator?.suspend() }
     func sceneDidBecomeActive(_ scene: UIScene) { coordinator?.resume() }
     func sceneDidDisconnect(_ scene: UIScene) { coordinator?.suspend() }
 }
