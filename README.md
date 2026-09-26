@@ -6,6 +6,7 @@ UIKit-оболочка над matrix-mobile с нативными аудиозв
 
 - Вход на сервер сборки, Keychain, единое обновление токенов и выход с отзывом серверной сессии.
 - После входа открывается matrix-mobile. Авторизацией управляет нативная часть; JavaScript получает только access-токен в память. Звонки из чата открываются нативно, без параллельного web-звонка.
+- Тема и кеш WebView сохраняются между запусками в отдельном хранилище сессии. После выхода данные очищаются; новый вход не использует настройки и данные предыдущей сессии.
 - Обычные уведомления открывают связанный экран. В «Организация → Устройства» видны привязки push и переключатель уведомлений/входящих звонков для каждой сессии.
 - Чаты и вход в звонки через matrix-mobile, без отдельного нативного списка. Нужны членство в чате и разрешение звонков от администратора.
 - Явное присоединение, постраничная галерея подключений, микрофон и выход.
@@ -59,7 +60,7 @@ Matrix Workspace/
     Auth/                    AuthService, KeychainStore
     Network/                 HTTPClient, ServerAddress
     Calls/                   Сигнализация, медиа, CallKit, PushKit, NativeCallCoordinator
-    Web/                     MatrixWebBridge, WebDocumentService
+    Web/                     MatrixWebBridge, WebDocumentService, WebDataStoreService
     Notifications/           NativeNotificationService
   Helpers/                   JSONValue
   Resources/                 Info.plist, Assets, LaunchScreen

@@ -52,7 +52,7 @@ final class WorkspaceView: UIView {
     private func makeConstraints() {
         [webView, errorPanel].forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            webView.topAnchor.constraint(equalTo: topAnchor),
             webView.leadingAnchor.constraint(equalTo: leadingAnchor), webView.trailingAnchor.constraint(equalTo: trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: bottomAnchor),
             errorPanel.centerYAnchor.constraint(equalTo: centerYAnchor),

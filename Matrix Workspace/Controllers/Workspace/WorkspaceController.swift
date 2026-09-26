@@ -4,18 +4,21 @@ import WebKit
 @MainActor
 final class WorkspaceController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     private let bridge: MatrixWebBridge
+    private let sessionId: UUID
     private var route = "/"
     private var active = true
+    private var stopped = false
     private lazy var documents = WebDocumentService(presenter: self)
     private lazy var customView: WorkspaceView = {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .nonPersistent()
+        config.websiteDataStore = WKWebsiteDataStore(forIdentifier: sessionId)
         config.allowsInlineMediaPlayback = true
         config.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "matrix")
         return WorkspaceView(configuration: config)
     }()
 
-    init(auth: AuthService, calls: NativeCallCoordinator, server: ServerAddress) {
+    init(auth: AuthService, calls: NativeCallCoordinator, server: ServerAddress, sessionId: UUID) {
+        self.sessionId = sessionId
         bridge = MatrixWebBridge(server: server, auth: auth, calls: calls)
         super.init(nibName: nil, bundle: nil)
     }
@@ -38,21 +41,28 @@ final class WorkspaceController: UIViewController, WKNavigationDelegate, WKUIDel
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
     func open(route: String) {
+        guard !stopped else { return }
         self.route = route
         guard isViewLoaded else { return }
         customView.showError(nil)
         customView.webView.load(URLRequest(url: bridge.applicationURL(route: route)))
     }
     func setActive(_ active: Bool) {
+        guard !stopped else { return }
         self.active = active
         guard isViewLoaded else { return }
         customView.webView.evaluateJavaScript("window.matrixNativeActive = \(active); window.dispatchEvent(new CustomEvent('matrix-native:active', {detail: \(active)}))", completionHandler: nil)
     }
     func stop() {
+        guard !stopped else { return }
+        stopped = true
         if isViewLoaded {
             customView.webView.stopLoading()
             customView.webView.configuration.userContentController.removeScriptMessageHandler(forName: "matrix", contentWorld: .page)
             documents.stop()
+            customView.webView.navigationDelegate = nil
+            customView.webView.uiDelegate = nil
+            customView.webView.loadHTMLString("", baseURL: nil)
         }
         dismiss(animated: false)
     }

@@ -150,7 +150,7 @@
 				};
 			};
 			buildConfigurationList = 42423CEA3065514C00A5D6A3 /* Build configuration list for PBXProject "Matrix Workspace" */;
-			developmentRegion = en;
+			developmentRegion = ru;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,

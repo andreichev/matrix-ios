@@ -42,7 +42,11 @@ final class AppCoordinator {
 
     private func showWorkspace() {
         guard let server = auth.current?.server else { return }
-        let controller = WorkspaceController(auth: auth, calls: services.calls, server: server)
+        guard let sessionId = auth.current?.id else {
+            showLogin(error: "Не удалось восстановить сессию. Войдите заново.")
+            return
+        }
+        let controller = WorkspaceController(auth: auth, calls: services.calls, server: server, sessionId: sessionId)
         workspace = controller
         navigationController.setViewControllers([controller], animated: false)
         services.notifications.synchronize()
